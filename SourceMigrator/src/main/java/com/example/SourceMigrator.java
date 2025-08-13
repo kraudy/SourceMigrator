@@ -194,7 +194,7 @@ public class SourceMigrator {
   private void showSourcePFs(String library) throws SQLException {
     try (Statement stmt = connection.createStatement();
           ResultSet rs = stmt.executeQuery(
-                  "SELECT SYSTEM_TABLE_NAME AS SourcePf, " +
+                  "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourcePf, " +
                           "COUNT(*) AS Members " +
                   "FROM QSYS2.SYSPARTITIONSTAT " +
                   "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
@@ -227,7 +227,7 @@ public class SourceMigrator {
         }
       }
       // Get specific Source PF
-      query = "SELECT SYSTEM_TABLE_NAME AS SourcePf, " +
+      query = "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourcePf, " +
               "SYSTEM_TABLE_SCHEMA AS Library " +
               "FROM QSYS2.SYSPARTITIONSTAT " +
               "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
@@ -236,7 +236,7 @@ public class SourceMigrator {
               "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
     } else {
       // Get all Source PF
-      query = "SELECT SYSTEM_TABLE_NAME AS SourcePf, " +
+      query = "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourcePf, " +
               "SYSTEM_TABLE_SCHEMA AS Library " +
               "FROM QSYS2.SYSPARTITIONSTAT " +
               "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
