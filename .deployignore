@@ -1,5 +1,7 @@
-# Exclude everything but target/*.jar
 *
-!SourceMigrator/
-!SourceMigrator/target
-!SourceMigrator/target/*.jar
+
+!scripts
+!scripts/*.sh
+
+!target
+!target/*.jar
