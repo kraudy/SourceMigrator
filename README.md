@@ -8,19 +8,19 @@ Tool for migrating IBM i source physical files ([PFs](https://github.com/kraudy/
 
 ## Install
 
-* `git clone git@github.com:kraudy/SourceMigrator.git` Clone repo.
-* `Ctrl + Shift + e` using [Code4i](https://codefori.github.io/docs/#/). Deploy `.jar`
+* Download `.jar` file
+* Upload `.jar` file using [Code4i](https://codefori.github.io/docs/#/) for drag and drop.
 
 ## Run
 
-Open PASE terminal 
+Open PASE terminal with Code4i
 
-* `cd $HOME/builds/SourceMigrator/SourceMigrator/target` Move to deployed location
 * `export QIBM_PASE_CCSID=1208` Set terminal ccsid
-* `java -jar SourceMigrator-1.0-SNAPSHOT.jar` Run tool
+* `java -jar SourceMigrator.jar` Run tool
 
 ## Compile
 
+* `git clone git@github.com:kraudy/SourceMigrator.git` Clone repo.
 * `mvn clean package` Create .jar
 
 ## Contribute

@@ -10,9 +10,9 @@ For that, I created **SourceMigrator**. It is a simple and minimal migration too
 
 ## Set up
 
-You could manually download the `.jar` file from this repo or do a `git clone ...` to your PC or directly to PASE.
+Download the `.jar` file from the repo release
 
-To upload the `.jar` file to PASE IFS you could use FTP or simply drag and drop with Code4i
+Upload the `.jar` file to PASE IFS using FTP or simply drag and drop with Code4i
 
 ## Run
 
