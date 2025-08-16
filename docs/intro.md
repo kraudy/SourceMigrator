@@ -31,6 +31,22 @@ Run tool: `java -jar SourceMigrator.jar`
 
 ## Migration
 
+`Enter` to use the default migration dir `sources`
+`Enter` to look for source Pf in your curlib
+`Enter` again to show the list of source pf in your library
 
+![alt text](./images/show_pfs.png)
+
+`Enter` one last time to migrate all the members of the listed source pf
+
+Here you will see the output and the statistics at the end
+
+![alt text](./images/show_migration.png)
+
+Under `sources/` you should see the migrated dir struct
+
+![alt text](./images/show_dirstruct.png)
+
+That's it.
 
 ##
