@@ -12,17 +12,24 @@ For that, I created **SourceMigrator**. It is a simple and minimal migration too
 
 Download the `.jar` file from the repo release
 
+![alt text](./images/get_jar.png)
+
 Upload the `.jar` file to PASE IFS using FTP or simply drag and drop with Code4i
+
+![alt text](./images/upload_jar.png)
 
 ## Run
 
+Open PASE terminal with Code4i
 
+![alt text](./images/open_terminal.png)
+
+Set terminal ccsid: `export QIBM_PASE_CCSID=1208`
+Run tool: `java -jar SourceMigrator.jar`
+
+![alt text](./images/start_tool.png)
 
 ## Migration
-
-
-
-## Time
 
 
 

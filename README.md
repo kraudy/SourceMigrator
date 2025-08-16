@@ -9,7 +9,7 @@ Tool for migrating IBM i source physical files ([PFs](https://github.com/kraudy/
 ## Install
 
 * Download `.jar` file
-* Upload `.jar` file using [Code4i](https://codefori.github.io/docs/#/) for drag and drop.
+* Upload `.jar` file to PASE IFS using [Code4i](https://codefori.github.io/docs/#/) for drag and drop.
 
 ## Run
 
