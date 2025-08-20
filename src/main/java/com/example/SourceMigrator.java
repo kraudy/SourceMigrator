@@ -43,7 +43,7 @@ public class SourceMigrator {
     this.connection.setAutoCommit(true);
   } 
   /* Main entry point to run the migration process.*/
-  public void run() {
+  public void run(String ifsOutputDirParam, String libraryParam, String sourcePfParam) {
     try {
       System.out.println("User: " + system.getUserId().trim().toUpperCase());
 
@@ -59,16 +59,41 @@ public class SourceMigrator {
         return;
       }
 
-      String ifsOutputDir = promptForOutputDirectory(homeDir);
-
-      String library = promptForLibrary();
+      String ifsOutputDir;
+      if (ifsOutputDirParam == null){
+        ifsOutputDir = promptForOutputDirectory(homeDir);
+      } else {
+        if (ifsOutputDirParam.startsWith("/")) { 
+          ifsOutputDir = ifsOutputDirParam;
+        } else {
+          ifsOutputDir = homeDir + "/" + ifsOutputDirParam;
+        }
+      }
+      
+      String library;
+      if (libraryParam == null){
+        library = promptForLibrary();
+      } else {
+        library = validateAndGetLibrary(libraryParam);
+        if (library.isEmpty()) {
+          return;
+        }
+      }
 
       ifsOutputDir = ifsOutputDir + "/" + library;
       createDirectory(ifsOutputDir);
 
-      showSourcePFs(library);
-
-      ResultSet sourcePFs = promptForSourcePFs(library);
+      ResultSet sourcePFs = null; 
+      if (sourcePfParam != null) {
+        sourcePFs = getSourcePFs(sourcePfParam, library);
+        if (sourcePFs == null) {
+          return;
+        }
+      } else if (libraryParam != null) {
+        sourcePFs = getSourcePFs("", library);
+      } else {
+        sourcePFs = promptForSourcePFs(library);
+      }
 
       long startTime = System.nanoTime();
       migrateSourcePFs(sourcePFs, ifsOutputDir);
@@ -110,6 +135,7 @@ public class SourceMigrator {
     return library; 
   } 
   private ResultSet promptForSourcePFs(String library) throws IOException, SQLException {
+    showSourcePFs(library);
     ResultSet sourcePFs = null;
     while (sourcePFs == null) {
       System.out.println("\nSpecify the name of a source PF or press 'Enter' to migrate all the source PFs in library: " + library);
@@ -222,7 +248,7 @@ public class SourceMigrator {
                           "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
                           "AND TRIM(SOURCE_TYPE) <> '' LIMIT 1")) {         
         if (!validateRs.next()) {
-          System.out.println(" *Source PF does not exist in library " + library);
+          System.out.println(" *Source PF " + sourcePf + " does not exist in library " + library);
           return null;
         }
       }
@@ -254,7 +280,7 @@ public class SourceMigrator {
                         "FROM QSYS2.SYSPARTITIONSTAT " +
                         "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' LIMIT 1")) {     
       if (!validateRs.next()) {
-        System.out.println("Library " + library + " does not exist in your system.");
+        System.out.println(" *Library " + library + " does not exist in your system.");
         // Show similar libs
         try (Statement relatedStmt = connection.createStatement();
               ResultSet relatedRs = relatedStmt.executeQuery(
@@ -295,7 +321,20 @@ public class SourceMigrator {
   } 
   public static void main(String... args) {
     try {
-      new SourceMigrator().run();
+      SourceMigrator migrator = new SourceMigrator();
+      String ifsOutputDirParam = null;
+      String libraryParam = null;
+      String sourcePfParam = null;
+      if (args.length > 0) {
+        ifsOutputDirParam = args[0].trim();
+      }
+      if (args.length > 1) {
+        libraryParam = args[1].trim().toUpperCase();
+      }
+      if (args.length > 2) {
+        sourcePfParam = args[2].trim().toUpperCase();
+      }
+      migrator.run(ifsOutputDirParam, libraryParam, sourcePfParam);
     } catch (Exception e) {
       e.printStackTrace();
     }
