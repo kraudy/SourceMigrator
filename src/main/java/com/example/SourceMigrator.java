@@ -59,40 +59,22 @@ public class SourceMigrator {
         return;
       }
 
-      String ifsOutputDir;
-      if (ifsOutputDirParam == null){
-        ifsOutputDir = promptForOutputDirectory(homeDir);
-      } else {
-        if (ifsOutputDirParam.startsWith("/")) { 
-          ifsOutputDir = ifsOutputDirParam;
-        } else {
-          ifsOutputDir = homeDir + "/" + ifsOutputDirParam;
-        }
+      String ifsOutputDir = getOutputDirectory(ifsOutputDirParam, homeDir);
+      if (ifsOutputDir.isEmpty()) {
+        return;
       }
       
-      String library;
-      if (libraryParam == null){
-        library = promptForLibrary();
-      } else {
-        library = validateAndGetLibrary(libraryParam);
-        if (library.isEmpty()) {
-          return;
-        }
+      String library = getLibrary(libraryParam);
+      if (library.isEmpty()) {
+        return;
       }
 
       ifsOutputDir = ifsOutputDir + "/" + library;
       createDirectory(ifsOutputDir);
 
-      ResultSet sourcePFs = null; 
-      if (sourcePfParam != null) {
-        sourcePFs = getSourcePFs(sourcePfParam, library);
-        if (sourcePFs == null) {
+      ResultSet sourcePFs = getSourcePFsResultSet(sourcePfParam, libraryParam, library);
+      if (sourcePFs == null) {
           return;
-        }
-      } else if (libraryParam != null) {
-        sourcePFs = getSourcePFs("", library);
-      } else {
-        sourcePFs = promptForSourcePFs(library);
       }
 
       long startTime = System.nanoTime();
@@ -110,12 +92,30 @@ public class SourceMigrator {
       cleanup();
     }
   } 
+  private String getOutputDirectory(String ifsOutputDirParam, String homeDir) throws IOException {
+    if (ifsOutputDirParam == null){
+      return promptForOutputDirectory(homeDir); // Prompt for path
+    }
+    if (ifsOutputDirParam.startsWith("/")) { 
+      return ifsOutputDirParam; // Full path
+    } 
+    return homeDir + "/" + ifsOutputDirParam; //Relative path
+  }
   private String promptForOutputDirectory(String homeDir) throws IOException {
     String defaultDir = homeDir + "/sources";
     System.out.println("\nSpecify the source dir destination or press 'Enter' to use: " + defaultDir);
     String sourceDir = inputReader.readLine().trim();
-    return sourceDir.isEmpty() ? defaultDir : homeDir + "/" + sourceDir;
+    if(sourceDir.startsWith("/")){
+      return sourceDir; // Full path
+    }
+    return sourceDir.isEmpty() ? defaultDir : homeDir + "/" + sourceDir; //Relative path
   } 
+  private String getLibrary(String libraryParam) throws IOException, SQLException {
+    if (libraryParam == null){
+      return promptForLibrary();
+    } 
+    return validateAndGetLibrary(libraryParam);
+  }
   private String promptForLibrary() throws IOException, SQLException {
     String library = "";
     while (library.isEmpty()) {
@@ -133,6 +133,42 @@ public class SourceMigrator {
       } 
     }
     return library; 
+  } 
+  private String validateAndGetLibrary(String library) throws SQLException {
+    try (Statement validateStmt = connection.createStatement();
+        ResultSet validateRs = validateStmt.executeQuery(
+                "SELECT 1 AS Exists " +
+                        "FROM QSYS2.SYSPARTITIONSTAT " +
+                        "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' LIMIT 1")) {     
+      if (!validateRs.next()) {
+        System.out.println(" *Library " + library + " does not exist in your system.");
+        // Show similar libs
+        try (Statement relatedStmt = connection.createStatement();
+              ResultSet relatedRs = relatedStmt.executeQuery(
+                      "SELECT SYSTEM_TABLE_SCHEMA AS library " +
+                              "FROM QSYS2.SYSPARTITIONSTAT " +
+                              "WHERE SYSTEM_TABLE_SCHEMA LIKE '%" + library + "%' " +
+                              "GROUP BY SYSTEM_TABLE_SCHEMA LIMIT 10")) {
+          if (relatedRs.next()) {
+            System.out.println("Did you mean: ");
+            do {
+              System.out.println(relatedRs.getString("library").trim());
+            } while (relatedRs.next());
+          }
+        }
+        return "";
+      }
+    }
+    return library; 
+  } 
+  private ResultSet getSourcePFsResultSet(String sourcePfParam, String libraryParam, String library) throws IOException, SQLException{
+    if (sourcePfParam != null) {
+      return getSourcePFs(sourcePfParam, library);
+    }
+    if (libraryParam != null) {
+      return getSourcePFs("", library);
+    }
+    return promptForSourcePFs(library);
   } 
   private ResultSet promptForSourcePFs(String library) throws IOException, SQLException {
     showSourcePFs(library);
@@ -272,33 +308,6 @@ public class SourceMigrator {
 
     Statement stmt = connection.createStatement();
     return stmt.executeQuery(query); 
-  } 
-  private String validateAndGetLibrary(String library) throws SQLException {
-    try (Statement validateStmt = connection.createStatement();
-        ResultSet validateRs = validateStmt.executeQuery(
-                "SELECT 1 AS Exists " +
-                        "FROM QSYS2.SYSPARTITIONSTAT " +
-                        "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' LIMIT 1")) {     
-      if (!validateRs.next()) {
-        System.out.println(" *Library " + library + " does not exist in your system.");
-        // Show similar libs
-        try (Statement relatedStmt = connection.createStatement();
-              ResultSet relatedRs = relatedStmt.executeQuery(
-                      "SELECT SYSTEM_TABLE_SCHEMA AS library " +
-                              "FROM QSYS2.SYSPARTITIONSTAT " +
-                              "WHERE SYSTEM_TABLE_SCHEMA LIKE '%" + library + "%' " +
-                              "GROUP BY SYSTEM_TABLE_SCHEMA LIMIT 10")) {
-          if (relatedRs.next()) {
-            System.out.println("Did you mean: ");
-            do {
-              System.out.println(relatedRs.getString("library").trim());
-            } while (relatedRs.next());
-          }
-        }
-        return "";
-      }
-    }
-    return library; 
   } 
   private void createDirectory(String dirPath) {
     File outputDir = new File(dirPath);
