@@ -1,4 +1,4 @@
-package com.example;
+package com.github.kraudy;
 import com.ibm.as400.access.AS400;
 import com.ibm.as400.access.AS400SecurityException;
 import com.ibm.as400.access.AS400JDBCDataSource;
