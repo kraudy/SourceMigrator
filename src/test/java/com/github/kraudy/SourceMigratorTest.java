@@ -1,38 +1,18 @@
 package com.github.kraudy;
 
-import junit.framework.Test;
-import junit.framework.TestCase;
-import junit.framework.TestSuite;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Unit test for simple App.
  */
-public class SourceMigratorTest 
-    extends TestCase
-{
-    /**
-     * Create the test case
-     *
-     * @param testName name of the test case
-     */
-    public SourceMigratorTest( String testName )
-    {
-        super( testName );
-    }
+public class SourceMigratorTest {
 
-    /**
-     * @return the suite of tests being tested
-     */
-    public static Test suite()
-    {
-        return new TestSuite( SourceMigratorTest.class );
-    }
-
-    /**
-     * Rigourous Test :-)
-     */
-    public void testApp()
-    {
-        assertTrue( true );
-    }
+  /**
+   * Rigorous Test :P
+   */
+  @Test
+  void testApp() {
+      assertTrue(true);
+  }
 }
