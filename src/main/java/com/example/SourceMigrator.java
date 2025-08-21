@@ -42,8 +42,8 @@ public class SourceMigrator {
     this.connection = dataSource.getConnection();
     this.connection.setAutoCommit(true);
   } 
-  /* Main entry point to run the migration process.*/
-  public void run(String ifsOutputDirParam, String libraryParam, String sourcePfParam) {
+  /* Main entry point of the migration process.*/
+  public void migrate(String ifsOutputDirParam, String libraryParam, String sourcePfParam) {
     try {
       System.out.println("User: " + system.getUserId().trim().toUpperCase());
 
@@ -334,7 +334,7 @@ public class SourceMigrator {
       if (args.length > 2) {
         sourcePfParam = args[2].trim().toUpperCase();
       }
-      migrator.run(ifsOutputDirParam, libraryParam, sourcePfParam);
+      migrator.migrate(ifsOutputDirParam, libraryParam, sourcePfParam);
     } catch (Exception e) {
       e.printStackTrace();
     }
