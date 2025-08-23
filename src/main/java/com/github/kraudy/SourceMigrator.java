@@ -161,16 +161,13 @@ public class SourceMigrator {
     return library; 
   } 
   private ResultSet getSourcePFsResultSet(String sourcePfParam, String libraryParam, String library) throws IOException, SQLException{
-    if (sourcePfParam != null) {
-      return getSourcePFs(sourcePfParam, library);
-    }
     if (libraryParam != null) {
-      return getSourcePFs("", library);
+      return sourcePfParam != null ? getSourcePFs(sourcePfParam, library) : getSourcePFs("", library);
     }
     return promptForSourcePFs(library);
   } 
   private ResultSet promptForSourcePFs(String library) throws IOException, SQLException {
-    showSourcePFs(library);
+    showSourcePFs(library); // Show list of source pfs
     ResultSet sourcePFs = null;
     while (sourcePFs == null) {
       System.out.println("\nSpecify the name of a source PF or press 'Enter' to migrate all the source PFs in library: " + library);
