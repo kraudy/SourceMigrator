@@ -66,13 +66,13 @@ public class SourceMigrator {
       ifsOutputDir = ifsOutputDir + "/" + library;
       createDirectory(ifsOutputDir);
 
-      ResultSet sourcePFs = getSourcePFsResultSet(sourcePfParam, libraryParam, library);
-      if (sourcePFs == null) {
+      String querySourcePFs = getSourcePFsQuery(sourcePfParam, libraryParam, library);
+      if (querySourcePFs.isEmpty()) {
           return;
       }
 
       long startTime = System.nanoTime();
-      migrateSourcePFs(sourcePFs, ifsOutputDir);
+      migrateSourcePFs(querySourcePFs, ifsOutputDir);
 
       System.out.println("\nMigration completed.");
       System.out.println("Total Source PFs migrated: " + totalSourcePFsMigrated);
@@ -160,36 +160,69 @@ public class SourceMigrator {
     }
     return library; 
   } 
-  private ResultSet getSourcePFsResultSet(String sourcePfParam, String libraryParam, String library) throws IOException, SQLException{
+  private String getSourcePFsQuery(String sourcePfParam, String libraryParam, String library) throws IOException, SQLException{
     if (libraryParam != null) {
       return sourcePfParam != null ? getSourcePFs(sourcePfParam, library) : getSourcePFs("", library);
     }
     return promptForSourcePFs(library);
   } 
-  private ResultSet promptForSourcePFs(String library) throws IOException, SQLException {
+  private String promptForSourcePFs(String library) throws IOException, SQLException {
     showSourcePFs(library); // Show list of source pfs
-    ResultSet sourcePFs = null;
-    while (sourcePFs == null) {
+    String query = "";
+    while (query.isEmpty()) {
       System.out.println("\nSpecify the name of a source PF or press 'Enter' to migrate all the source PFs in library: " + library);
       String sourcePf = inputReader.readLine().trim().toUpperCase();
-      sourcePFs = getSourcePFs(sourcePf, library);
+      query = getSourcePFs(sourcePf, library);
     }
-    return sourcePFs;
+    return query;
   } 
-  private void migrateSourcePFs(ResultSet sourcePFs, String baseOutputDir) throws SQLException, IOException, AS400SecurityException, ErrorCompletingRequestException, InterruptedException, PropertyVetoException {
-    while (sourcePFs.next()) {
-      String library = sourcePFs.getString("Library").trim();
-      String sourcePf = sourcePFs.getString("SourcePf").trim();     
-      System.out.println("\n\nMigrating Source PF: " + sourcePf + " in library: " + library);
+  private String getSourcePFs(String sourcePf, String library) throws SQLException {
+    if (!sourcePf.isEmpty()) {
+      // Validate if Source PF exists
+      try (Statement validateStmt = connection.createStatement();
+          ResultSet validateRs = validateStmt.executeQuery(
+                  "SELECT 1 AS Exist FROM QSYS2.SYSPARTITIONSTAT " +
+                          "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
+                          "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
+                          "AND TRIM(SOURCE_TYPE) <> '' LIMIT 1")) {         
+        if (!validateRs.next()) {
+          System.out.println(" *Source PF " + sourcePf + " does not exist in library " + library);
+          return "";
+        }
+      }
+      // Get specific Source PF
+      return  "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourcePf, " +
+              "SYSTEM_TABLE_SCHEMA AS Library " +
+              "FROM QSYS2.SYSPARTITIONSTAT " +
+              "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
+              "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
+              "AND TRIM(SOURCE_TYPE) <> '' " +
+              "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
+    } 
+    // Get all Source PF
+    return  "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourcePf, " +
+            "SYSTEM_TABLE_SCHEMA AS Library " +
+            "FROM QSYS2.SYSPARTITIONSTAT " +
+            "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
+            "AND TRIM(SOURCE_TYPE) <> '' " +
+            "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
+  } 
+  private void migrateSourcePFs(String querySourcePFs, String baseOutputDir) throws SQLException, IOException, AS400SecurityException, ErrorCompletingRequestException, InterruptedException, PropertyVetoException {
+    try(Statement stmt = connection.createStatement();
+      ResultSet sourcePFs = stmt.executeQuery(querySourcePFs)){
+      while (sourcePFs.next()) {
+        String library = sourcePFs.getString("Library").trim();
+        String sourcePf = sourcePFs.getString("SourcePf").trim();     
+        System.out.println("\n\nMigrating Source PF: " + sourcePf + " in library: " + library);
 
-      String pfOutputDir = baseOutputDir + '/' + sourcePf;
-      createDirectory(pfOutputDir);
+        String pfOutputDir = baseOutputDir + '/' + sourcePf;
+        createDirectory(pfOutputDir);
 
-      migrateMembers(library, sourcePf, pfOutputDir);
+        migrateMembers(library, sourcePf, pfOutputDir);
 
-      totalSourcePFsMigrated++;
+        totalSourcePFsMigrated++;
+      }
     }
-    sourcePFs.close(); 
   } 
   private void migrateMembers(String library, String sourcePf, String ifsOutputDir) throws SQLException, IOException, AS400SecurityException, ErrorCompletingRequestException, InterruptedException, PropertyVetoException {
     try (Statement stmt = connection.createStatement();
@@ -268,42 +301,6 @@ public class SourceMigrator {
         System.out.printf("    %-13s | %17s%n", sourcePf, membersCount);
       }
     } 
-  } 
-  private ResultSet getSourcePFs(String sourcePf, String library) throws SQLException {
-    String query;
-    if (!sourcePf.isEmpty()) {
-      // Validate if Source PF exists
-      try (Statement validateStmt = connection.createStatement();
-          ResultSet validateRs = validateStmt.executeQuery(
-                  "SELECT 1 AS Exist FROM QSYS2.SYSPARTITIONSTAT " +
-                          "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
-                          "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
-                          "AND TRIM(SOURCE_TYPE) <> '' LIMIT 1")) {         
-        if (!validateRs.next()) {
-          System.out.println(" *Source PF " + sourcePf + " does not exist in library " + library);
-          return null;
-        }
-      }
-      // Get specific Source PF
-      query = "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourcePf, " +
-              "SYSTEM_TABLE_SCHEMA AS Library " +
-              "FROM QSYS2.SYSPARTITIONSTAT " +
-              "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
-              "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
-              "AND TRIM(SOURCE_TYPE) <> '' " +
-              "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
-    } else {
-      // Get all Source PF
-      query = "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourcePf, " +
-              "SYSTEM_TABLE_SCHEMA AS Library " +
-              "FROM QSYS2.SYSPARTITIONSTAT " +
-              "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
-              "AND TRIM(SOURCE_TYPE) <> '' " +
-              "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
-    }
-
-    Statement stmt = connection.createStatement();
-    return stmt.executeQuery(query); 
   } 
   private void createDirectory(String dirPath) {
     File outputDir = new File(dirPath);
