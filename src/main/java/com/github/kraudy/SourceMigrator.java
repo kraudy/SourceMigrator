@@ -42,6 +42,7 @@ public class SourceMigrator {
     this.connection = dataSource.getConnection();
     this.connection.setAutoCommit(true);
   } 
+  
   /* Main entry point of the migration process.*/
   public void migrate(String ifsOutputDirParam, String libraryParam, String sourcePfParam) {
     try {
