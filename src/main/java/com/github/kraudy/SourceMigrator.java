@@ -53,13 +53,7 @@ public class SourceMigrator {
       String systemCcsid = getCcsid();
       System.out.println("System's CCSID: " + systemCcsid);
 
-      String homeDir = currentUser.getHomeDirectory();
-      if (homeDir == null || homeDir.isEmpty()) {
-        System.out.println("The current user has no home directory.");
-        return;
-      }
-
-      String ifsOutputDir = getOutputDirectory(ifsOutputDirParam, homeDir);
+      String ifsOutputDir = getOutputDirectory(ifsOutputDirParam);
       if (ifsOutputDir.isEmpty()) {
         return;
       }
@@ -92,13 +86,18 @@ public class SourceMigrator {
       cleanup();
     }
   } 
-  private String getOutputDirectory(String ifsOutputDirParam, String homeDir) throws IOException {
+  private String getOutputDirectory(String ifsOutputDirParam) throws IOException {
+    String homeDir = currentUser.getHomeDirectory(); // Needed for relative path
+    if (homeDir == null || homeDir.isEmpty()) {
+      System.out.println(" *The current user has no home directory.");
+      return "";
+    }
     if (ifsOutputDirParam == null){
       return promptForOutputDirectory(homeDir); // Prompt for path
     }
     if (ifsOutputDirParam.startsWith("/")) { 
       return ifsOutputDirParam; // Full path
-    } 
+    }
     return homeDir + "/" + ifsOutputDirParam; //Relative path
   }
   private String promptForOutputDirectory(String homeDir) throws IOException {
