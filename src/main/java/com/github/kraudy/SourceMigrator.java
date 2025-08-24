@@ -6,15 +6,20 @@ import com.ibm.as400.access.AS400JDBCDataSource;
 import com.ibm.as400.access.CommandCall;
 import com.ibm.as400.access.ErrorCompletingRequestException;
 import com.ibm.as400.access.User;
+
+import io.github.theprez.dotenv_ibmi.IBMiDotEnv;
+
 import java.beans.PropertyVetoException;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 /*
@@ -25,11 +30,11 @@ public class SourceMigrator {
   private static final String INVARIANT_CCSID = "37"; // EBCDIC
   private final AS400 system;
   private final Connection connection;
-  private final BufferedReader inputReader;
   private final User currentUser;
   private int totalSourcePFsMigrated = 0;
   private int totalMembersMigrated = 0;
   private int migrationErrors = 0;
+  private Scanner scanner;
 
   /*
    * Constructor initializes the AS400 connection and JDBC.
@@ -37,12 +42,19 @@ public class SourceMigrator {
    * @throws Exception if connection fails
    */
   public SourceMigrator() throws Exception {
-    this.system = new AS400();
-    this.currentUser = new User(system, system.getUserId());
-    this.inputReader = new BufferedReader(new InputStreamReader(System.in));
+    this.system = IBMiDotEnv.getNewSystemConnection(true);
+
+    // Database
     AS400JDBCDataSource dataSource = new AS400JDBCDataSource(system);
     this.connection = dataSource.getConnection();
     this.connection.setAutoCommit(true);
+
+    // User
+    this.currentUser = new User(system, system.getUserId());
+    this.currentUser.loadUserInformation();
+
+    // Input
+    this.scanner = new Scanner(System.in);
   }
 
   /* Main entry point of the migration process. */
@@ -106,12 +118,14 @@ public class SourceMigrator {
   }
 
   private String promptForOutputDirectory(String homeDir) throws IOException {
+
     String defaultDir = homeDir + "/sources";
-    System.out.println("\nSpecify the source dir destination or press 'Enter' to use: " + defaultDir);
-    String sourceDir = inputReader.readLine().trim();
+    String sourceDir = prompt("Specify the source dir destination or press <Enter> to use:", defaultDir);
+
     if (sourceDir.startsWith("/")) {
       return sourceDir; // Full path
     }
+
     return sourceDir.isEmpty() ? defaultDir : homeDir + "/" + sourceDir; // Relative path
   }
 
@@ -123,23 +137,25 @@ public class SourceMigrator {
   }
 
   private String promptForLibrary() throws IOException, SQLException {
+
     String library = "";
     while (library.isEmpty()) {
-      System.out
-          .println("\nSpecify the name of a library or press enter to search for Source PFs in the current library: "
-              + currentUser.getCurrentLibraryName());
-      library = inputReader.readLine().trim().toUpperCase();
+
+      library = prompt(
+          "Specify the name of a library or press <Enter> to search for Source PFs in the current library:",
+          currentUser.getCurrentLibraryName());
+
       if (library.isEmpty()) {
         library = currentUser.getCurrentLibraryName();
-        if ("*CRTDFT".equals(library)) {
+        if (library == null || "*CRTDFT".equals(library)) {
           System.out.println("The user does not have a current library");
           library = "";
-          continue;
         }
       } else {
         library = validateAndGetLibrary(library);
       }
     }
+
     return library;
   }
 
@@ -147,7 +163,7 @@ public class SourceMigrator {
     try (Statement validateStmt = connection.createStatement();
         ResultSet validateRs = validateStmt.executeQuery(
             "SELECT 1 AS Exists " +
-                "FROM QSYS2.SYSPARTITIONSTAT " +
+                "FROM QSYS2. SYSPARTITIONSTAT " +
                 "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' LIMIT 1")) {
       if (!validateRs.next()) {
         System.out.println(" *Library " + library + " does not exist in your system.");
@@ -155,7 +171,7 @@ public class SourceMigrator {
         try (Statement relatedStmt = connection.createStatement();
             ResultSet relatedRs = relatedStmt.executeQuery(
                 "SELECT SYSTEM_TABLE_SCHEMA AS library " +
-                    "FROM QSYS2.SYSPARTITIONSTAT " +
+                    "FROM QSYS2. SYSPARTITIONSTAT " +
                     "WHERE SYSTEM_TABLE_SCHEMA LIKE '%" + library + "%' " +
                     "GROUP BY SYSTEM_TABLE_SCHEMA LIMIT 10")) {
           if (relatedRs.next()) {
@@ -182,12 +198,15 @@ public class SourceMigrator {
   private String promptForSourcePFs(String library) throws IOException, SQLException {
     showSourcePFs(library); // Show list of source pfs
     String query = "";
+
     while (query.isEmpty()) {
-      System.out.println(
-          "\nSpecify the name of a source PF or press 'Enter' to migrate all the source PFs in library: " + library);
-      String sourcePf = inputReader.readLine().trim().toUpperCase();
+      String sourcePf = prompt(
+          "Specify the name of a source PF or press <Enter> to migrate all the source PFs in library: ",
+          "");
+
       query = getSourcePFs(sourcePf, library);
     }
+
     return query;
   }
 
@@ -196,7 +215,7 @@ public class SourceMigrator {
       // Validate if Source PF exists
       try (Statement validateStmt = connection.createStatement();
           ResultSet validateRs = validateStmt.executeQuery(
-              "SELECT 1 AS Exist FROM QSYS2.SYSPARTITIONSTAT " +
+              "SELECT 1 AS Exist FROM QSYS2. SYSPARTITIONSTAT " +
                   "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
                   "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
                   "AND TRIM(SOURCE_TYPE) <> '' LIMIT 1")) {
@@ -208,7 +227,7 @@ public class SourceMigrator {
       // Get specific Source PF
       return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourcePf, " +
           "SYSTEM_TABLE_SCHEMA AS Library " +
-          "FROM QSYS2.SYSPARTITIONSTAT " +
+          "FROM QSYS2. SYSPARTITIONSTAT " +
           "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
           "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
           "AND TRIM(SOURCE_TYPE) <> '' " +
@@ -217,7 +236,7 @@ public class SourceMigrator {
     // Get all Source PF
     return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourcePf, " +
         "SYSTEM_TABLE_SCHEMA AS Library " +
-        "FROM QSYS2.SYSPARTITIONSTAT " +
+        "FROM QSYS2. SYSPARTITIONSTAT " +
         "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
         "AND TRIM(SOURCE_TYPE) <> '' " +
         "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
@@ -227,6 +246,7 @@ public class SourceMigrator {
       AS400SecurityException, ErrorCompletingRequestException, InterruptedException, PropertyVetoException {
     try (Statement stmt = connection.createStatement();
         ResultSet sourcePFs = stmt.executeQuery(querySourcePFs)) {
+
       while (sourcePFs.next()) {
         String library = sourcePFs.getString("Library").trim();
         String sourcePf = sourcePFs.getString("SourcePf").trim();
@@ -247,46 +267,58 @@ public class SourceMigrator {
     try (Statement stmt = connection.createStatement();
         ResultSet rsMembers = stmt.executeQuery(
             "SELECT SYSTEM_TABLE_MEMBER AS Member, SOURCE_TYPE AS SourceType " +
-                "FROM QSYS2.SYSPARTITIONSTAT " +
+                "FROM QSYS2. SYSPARTITIONSTAT " +
                 "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
                 "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
                 "AND TRIM(SOURCE_TYPE) <> ''")) {
+
+      List<CompletableFuture<Void>> futures = new ArrayList<>();
       while (rsMembers.next()) {
         String memberName = rsMembers.getString("Member").trim();
         String sourceType = rsMembers.getString("SourceType").trim();
-        System.out.println("\n=== Processing Member: " + memberName + " ===");
 
-        if (!migrateMemberUsingCommand(library, sourcePf, memberName, sourceType, ifsOutputDir)) {
-          migrationErrors++;
-        } else {
-          totalMembersMigrated++;
-        }
+        CompletableFuture<Void> future = migrateMemberAsync(library, sourcePf, memberName, sourceType, ifsOutputDir);
+        futures.add(future);
       }
+
+      CompletableFuture<Void> allFutures = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+      allFutures.join();
     }
   }
 
-  private boolean migrateMemberUsingCommand(String library, String sourcePf, String memberName, String sourceType,
-      String ifsOutputDir) throws IOException, AS400SecurityException, ErrorCompletingRequestException,
-      InterruptedException, PropertyVetoException {
-    String commandStr = "CPYTOSTMF FROMMBR('/QSYS.lib/" + library + ".lib/" + sourcePf + ".file/" + memberName
-        + ".mbr') " +
-        "TOSTMF('" + ifsOutputDir + "/" + memberName + "." + sourceType + "') " +
-        "STMFOPT(*REPLACE) STMFCCSID(" + UTF8_CCSID + ") ENDLINFMT(*LF)";
+  private CompletableFuture<Void> migrateMemberAsync(String library, String sourcePf, String memberName,
+      String sourceType, String ifsOutputDir) {
+    return CompletableFuture.runAsync(() -> {
+      try {
+        String commandStr = "CPYTOSTMF FROMMBR('/QSYS.lib/" + library + ".lib/" + sourcePf + ".file/" + memberName
+            + ".mbr') " +
+            "TOSTMF('" + ifsOutputDir + "/" + memberName + "." + sourceType + "') " +
+            "STMFOPT(*REPLACE) STMFCCSID(" + UTF8_CCSID + ") ENDLINFMT(*LF)";
 
-    CommandCall cmd = new CommandCall(system);
-    if (!cmd.run(commandStr)) {
-      System.out.println("Could not migrate " + memberName + " ***");
-      return false;
-    }
+        CommandCall cmd = new CommandCall(system);
+        if (!cmd.run(commandStr)) {
+          System.out.println("Could not migrate " + memberName + ": Failed");
+          migrationErrors++;
+        } else {
+          System.out.println("Migrated " + memberName + ": OK");
+          totalMembersMigrated++;
+        }
 
-    System.out.println("Migrated " + memberName + " successfully");
-    return true;
+      } catch (AS400SecurityException | ErrorCompletingRequestException | IOException | InterruptedException
+          | PropertyVetoException e) {
+
+        System.out.println("Could not migrate " + memberName + ": Failed");
+        migrationErrors++;
+        e.printStackTrace();
+      }
+
+    });
   }
 
   private String getCcsid() throws SQLException {
     try (Statement stmt = connection.createStatement();
         ResultSet rs = stmt.executeQuery(
-            "Select CCSID From QSYS2.SYSCOLUMNS WHERE TABLE_NAME = 'SYSPARTITIONSTAT'" +
+            "Select CCSID From QSYS2. SYSCOLUMNS WHERE TABLE_NAME = 'SYSPARTITIONSTAT'" +
                 "And TABLE_SCHEMA = 'QSYS2' And COLUMN_NAME = 'SYSTEM_TABLE_NAME' ")) {
       if (rs.next()) {
         return rs.getString("CCSID").trim();
@@ -297,7 +329,7 @@ public class SourceMigrator {
 
   private String getSystemName() throws SQLException {
     try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery("SELECT CURRENT_SERVER AS Server FROM SYSIBM.SYSDUMMY1")) {
+        ResultSet rs = stmt.executeQuery("SELECT CURRENT_SERVER AS Server FROM SYSIBM. SYSDUMMY1")) {
       if (rs.next()) {
         return rs.getString("Server").trim();
       }
@@ -306,11 +338,12 @@ public class SourceMigrator {
   }
 
   private void showSourcePFs(String library) throws SQLException {
+    int total = 0;
     try (Statement stmt = connection.createStatement();
         ResultSet rs = stmt.executeQuery(
             "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourcePf, " +
                 "COUNT(*) AS Members " +
-                "FROM QSYS2.SYSPARTITIONSTAT " +
+                "FROM QSYS2. SYSPARTITIONSTAT " +
                 "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
                 "AND TRIM(SOURCE_TYPE) <> '' " +
                 "GROUP BY SYSTEM_TABLE_NAME")) {
@@ -321,8 +354,10 @@ public class SourceMigrator {
       while (rs.next()) {
         String sourcePf = rs.getString("SourcePf").trim();
         String membersCount = rs.getString("Members").trim();
+        total += Integer.parseInt(membersCount);
         System.out.printf("    %-13s | %17s%n", sourcePf, membersCount);
       }
+      System.out.println(String.format("   Total: %27s%n", total));
     }
   }
 
@@ -342,17 +377,34 @@ public class SourceMigrator {
       if (system != null) {
         system.disconnectAllServices();
       }
+
+      if (scanner != null) {
+        scanner.close();
+      }
+
     } catch (SQLException e) {
       e.printStackTrace();
     }
   }
 
+  private String prompt(String message, String defaultValue) {
+    System.out.print(message);
+
+    if (!defaultValue.isEmpty())
+      System.out.print(" [" + defaultValue + "]: ");
+
+    String input = this.scanner.nextLine().trim();
+    return input.isEmpty() ? defaultValue : input.trim().toUpperCase();
+  }
+
   public static void main(String... args) {
+    String ifsOutputDirParam = null;
+    String libraryParam = null;
+    String sourcePfParam = null;
+
     try {
       SourceMigrator migrator = new SourceMigrator();
-      String ifsOutputDirParam = null;
-      String libraryParam = null;
-      String sourcePfParam = null;
+
       if (args.length > 0) {
         ifsOutputDirParam = args[0].trim();
       }
@@ -362,7 +414,9 @@ public class SourceMigrator {
       if (args.length > 2) {
         sourcePfParam = args[2].trim().toUpperCase();
       }
+
       migrator.migrate(ifsOutputDirParam, libraryParam, sourcePfParam);
+
     } catch (Exception e) {
       e.printStackTrace();
     }
