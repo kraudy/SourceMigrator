@@ -263,7 +263,8 @@ public class SourceMigrator {
       AS400SecurityException, ErrorCompletingRequestException, InterruptedException, PropertyVetoException {
     try (Statement stmt = connection.createStatement();
         ResultSet rsMembers = stmt.executeQuery(
-            "SELECT SYSTEM_TABLE_MEMBER AS Member, SOURCE_TYPE AS SourceType " +
+            "SELECT CAST(SYSTEM_TABLE_MEMBER AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS Member, " + 
+                    "CAST(SOURCE_TYPE AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourceType " +
                 "FROM QSYS2. SYSPARTITIONSTAT " +
                 "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
                 "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
