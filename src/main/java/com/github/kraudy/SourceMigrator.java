@@ -1,5 +1,7 @@
 package com.github.kraudy;
 
+import com.github.CliHandler;
+
 import com.ibm.as400.access.AS400;
 import com.ibm.as400.access.AS400SecurityException;
 import com.ibm.as400.access.AS400JDBCDataSource;
@@ -22,26 +24,37 @@ import java.util.Scanner;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-/*
-  Tool for migrating IBM i source physical files (PFs) to IFS stream files.
-*/
+/**
+ * Migrates IBM i source physical files to IFS stream files.
+ * @param ifsOutputDirParam IFS output directory (absolute or relative to home). Required in non-interactive mode.
+ * @param libraryParam Library name. If null in interactive mode, prompts user.
+ * @param sourcePfParam Specific source PF name (optional).
+ * @return MigrationResult with outcomes. //TODO: Coming soon.
+ * @throws Exception on connection or migration failures.
+ */
+
 public class SourceMigrator {
   private static final String UTF8_CCSID = "1208"; // UTF-8 for stream files
-  private static final String INVARIANT_CCSID = "37"; // EBCDIC
+  public static final String INVARIANT_CCSID = "37"; // EBCDIC
   private final AS400 system;
   private final Connection connection;
   private final User currentUser;
   private int totalSourcePFsMigrated = 0;
   private int totalMembersMigrated = 0;
   private int migrationErrors = 0;
-  private Scanner scanner;
-  private boolean interactive;
+  private Scanner scanner; // TODO: Remove from here?
+  private final boolean interactive;
+  private CliHandler cliHandler;
 
   /*
    * Constructor initializes the AS400 connection and JDBC.
    * 
    * @throws Exception if connection fails
    */
+  public SourceMigrator(AS400 system, boolean interactive) throws Exception {
+    this(system, new AS400JDBCDataSource(system).getConnection(), interactive);
+  }
+
   public SourceMigrator(AS400 system, Connection connection, boolean interactive) throws Exception {
     this.system = system;
 
@@ -56,12 +69,7 @@ public class SourceMigrator {
     // Input
     this.interactive = interactive;
     this.scanner = interactive ? new Scanner(System.in) : null;
-    // TODO: If interactive, init cliHandler
-    // this.cliHandler = new CliHandler(scanner, connection, currentUser);
-  }
-
-  public SourceMigrator(AS400 system) throws Exception {
-    this(system, new AS400JDBCDataSource(system).getConnection(), true);
+    this.cliHandler = interactive ? new CliHandler(scanner, connection, currentUser): null;
   }
 
   /* Main entry point of the migration process. */
@@ -112,11 +120,16 @@ public class SourceMigrator {
   private String getOutputDirectory(String ifsOutputDirParam) throws IOException {
     String homeDir = currentUser.getHomeDirectory(); // Needed for relative path
     if (homeDir == null || homeDir.isEmpty()) {
-      System.out.println(" *The current user has no home directory.");
-      return "";
+      // TODO: homeDir = "/tmp"; // Fallback? for interactive and non?
+      if (interactive){
+        System.out.println(" *The current user has no home directory.");
+        return "";  
+      }
+      throw new IllegalArgumentException("The current user has no home directory.");
     }
     if (ifsOutputDirParam == null) {
-      return promptForOutputDirectory(homeDir); // Prompt for path
+      if (interactive) return cliHandler.promptForOutputDirectory(homeDir); // Prompt for path
+      throw new IllegalArgumentException("Output directory required in non-interactive mode");
     }
     if (ifsOutputDirParam.startsWith("/")) {
       return ifsOutputDirParam; // Full path
@@ -124,71 +137,22 @@ public class SourceMigrator {
     return homeDir + "/" + ifsOutputDirParam; // Relative path
   }
 
-  private String promptForOutputDirectory(String homeDir) throws IOException {
-
-    String defaultDir = homeDir + "/sources";
-    String sourceDir = prompt("Specify the source dir destination or press <Enter> to use:", defaultDir);
-
-    if (sourceDir.startsWith("/")) {
-      return sourceDir; // Full path
-    }
-
-    return sourceDir.isEmpty() ? defaultDir : homeDir + "/" + sourceDir; // Relative path
-  }
-
   private String getLibrary(String libraryParam) throws IOException, SQLException {
     if (libraryParam == null) {
-      return promptForLibrary();
+      if (interactive) return cliHandler.promptForLibrary();
+      throw new IllegalArgumentException("Library required in non-interactive mode");
     }
-    return validateAndGetLibrary(libraryParam);
+    return validateLibraryNonInteractive(libraryParam);
   }
 
-  private String promptForLibrary() throws IOException, SQLException {
-
-    String library = "";
-    while (library.isEmpty()) {
-
-      library = prompt(
-          "Specify the name of a library or press <Enter> to search for Source PFs in the current library:",
-          currentUser.getCurrentLibraryName());
-
-      if (library.isEmpty()) {
-        library = currentUser.getCurrentLibraryName();
-        if (library == null || "*CRTDFT".equals(library)) {
-          System.out.println("The user does not have a current library");
-          library = "";
-        }
-      } else {
-        library = validateAndGetLibrary(library);
-      }
-    }
-
-    return library;
-  }
-
-  private String validateAndGetLibrary(String library) throws SQLException {
+  private String validateLibraryNonInteractive(String library) throws SQLException {
     try (Statement validateStmt = connection.createStatement();
         ResultSet validateRs = validateStmt.executeQuery(
             "SELECT 1 AS Exists " +
                 "FROM QSYS2. SYSPARTITIONSTAT " +
                 "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' LIMIT 1")) {
       if (!validateRs.next()) {
-        System.out.println(" *Library " + library + " does not exist in your system.");
-        // Show similar libs
-        try (Statement relatedStmt = connection.createStatement();
-            ResultSet relatedRs = relatedStmt.executeQuery(
-                "SELECT SYSTEM_TABLE_SCHEMA AS library " +
-                    "FROM QSYS2. SYSPARTITIONSTAT " +
-                    "WHERE SYSTEM_TABLE_SCHEMA LIKE '%" + library + "%' " +
-                    "GROUP BY SYSTEM_TABLE_SCHEMA LIMIT 10")) {
-          if (relatedRs.next()) {
-            System.out.println("Did you mean: ");
-            do {
-              System.out.println(relatedRs.getString("library").trim());
-            } while (relatedRs.next());
-          }
-        }
-        return "";
+        throw new IllegalArgumentException("Library " + library + " does not exist in your system.");
       }
     }
     return library;
@@ -196,28 +160,15 @@ public class SourceMigrator {
 
   private String getSourcePFsQuery(String sourcePfParam, String libraryParam, String library)
       throws IOException, SQLException {
-    if (libraryParam != null) {
-      return sourcePfParam != null ? getSourcePFs(sourcePfParam, library) : getSourcePFs("", library);
+    if (sourcePfParam == null){
+      if (interactive) return cliHandler.promptForSourcePFs(library);;
+      return getSourcePFsNonInteractive("", library); // Get all source pf in library
     }
-    return promptForSourcePFs(library);
+    return getSourcePFsNonInteractive(sourcePfParam, library); // Get specific source pf in library
+
   }
 
-  private String promptForSourcePFs(String library) throws IOException, SQLException {
-    showSourcePFs(library); // Show list of source pfs
-    String query = "";
-
-    while (query.isEmpty()) {
-      String sourcePf = prompt(
-          "Specify the name of a source PF or press <Enter> to migrate all the source PFs in library: ",
-          "");
-
-      query = getSourcePFs(sourcePf, library);
-    }
-
-    return query;
-  }
-
-  private String getSourcePFs(String sourcePf, String library) throws SQLException {
+  private String getSourcePFsNonInteractive(String sourcePf, String library) throws SQLException {
     if (!sourcePf.isEmpty()) {
       // Validate if Source PF exists
       try (Statement validateStmt = connection.createStatement();
@@ -227,22 +178,15 @@ public class SourceMigrator {
                   "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
                   "AND TRIM(SOURCE_TYPE) <> '' LIMIT 1")) {
         if (!validateRs.next()) {
-          System.out.println(" *Source PF " + sourcePf + " does not exist in library " + library);
-          return "";
+          throw new IllegalArgumentException("Source PF " + sourcePf + " does not exist in library " + library);
         }
       }
-      // Get specific Source PF
-      return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourcePf " +
-          "FROM QSYS2. SYSPARTITIONSTAT " +
-          "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
-          "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
-          "AND TRIM(SOURCE_TYPE) <> '' " +
-          "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
     }
-    // Get all Source PF
+    // Get specific or all Source PF
     return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourcePf " +
         "FROM QSYS2. SYSPARTITIONSTAT " +
         "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
+        (sourcePf.isEmpty() ? "" : "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' ") +
         "AND TRIM(SOURCE_TYPE) <> '' " +
         "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
   }
@@ -342,30 +286,6 @@ public class SourceMigrator {
     return "UNKNOWN";
   }
 
-  private void showSourcePFs(String library) throws SQLException {
-    int total = 0;
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(
-            "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourcePf, " +
-                "COUNT(*) AS Members " +
-                "FROM QSYS2. SYSPARTITIONSTAT " +
-                "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
-                "AND TRIM(SOURCE_TYPE) <> '' " +
-                "GROUP BY SYSTEM_TABLE_NAME")) {
-      System.out.println("\nList of available Source PFs in library: " + library);
-      System.out.println("    SourcePf      | Number of Members");
-      System.out.println("    ------------- | -----------------");
-
-      while (rs.next()) {
-        String sourcePf = rs.getString("SourcePf").trim();
-        String membersCount = rs.getString("Members").trim();
-        total += Integer.parseInt(membersCount);
-        System.out.printf("    %-13s | %17s%n", sourcePf, membersCount);
-      }
-      System.out.println(String.format("   Total: %27s%n", total));
-    }
-  }
-
   private void createDirectory(String dirPath) {
     File outputDir = new File(dirPath);
     if (!outputDir.exists()) {
@@ -392,29 +312,23 @@ public class SourceMigrator {
     }
   }
 
-  private String prompt(String message, String defaultValue) {
-    System.out.print(message);
-
-    if (!defaultValue.isEmpty())
-      System.out.print(" [" + defaultValue + "]: ");
-
-    String input = this.scanner.nextLine().trim();
-    return input.isEmpty() ? defaultValue : input.trim().toUpperCase();
-  }
-
   public static void main(String... args) {
     String ifsOutputDirParam = null;
     String libraryParam = null;
     String sourcePfParam = null;
+    AS400 system = null;
+    SourceMigrator migrator = null;
 
     try {
-      SourceMigrator migrator = new SourceMigrator(IBMiDotEnv.getNewSystemConnection(true));
-
+      system = IBMiDotEnv.getNewSystemConnection(true);
+      
       if (args.length > 0) {
         ifsOutputDirParam = args[0].trim();
+        migrator = new SourceMigrator(system, true);
       }
       if (args.length > 1) {
         libraryParam = args[1].trim().toUpperCase();
+        migrator = new SourceMigrator(system, false);
       }
       if (args.length > 2) {
         sourcePfParam = args[2].trim().toUpperCase();
