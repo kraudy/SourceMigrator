@@ -35,18 +35,18 @@ public class SourceMigrator {
   private int totalMembersMigrated = 0;
   private int migrationErrors = 0;
   private Scanner scanner;
+  private boolean interactive;
 
   /*
    * Constructor initializes the AS400 connection and JDBC.
    * 
    * @throws Exception if connection fails
    */
-  public SourceMigrator() throws Exception {
-    this.system = IBMiDotEnv.getNewSystemConnection(true);
+  public SourceMigrator(AS400 system, Connection connection, boolean interactive) throws Exception {
+    this.system = system;
 
     // Database
-    AS400JDBCDataSource dataSource = new AS400JDBCDataSource(system);
-    this.connection = dataSource.getConnection();
+    this.connection = connection;
     this.connection.setAutoCommit(true);
 
     // User
@@ -54,7 +54,14 @@ public class SourceMigrator {
     this.currentUser.loadUserInformation();
 
     // Input
-    this.scanner = new Scanner(System.in);
+    this.interactive = interactive;
+    this.scanner = interactive ? new Scanner(System.in) : null;
+    // TODO: If interactive, init cliHandler
+    // this.cliHandler = new CliHandler(scanner, connection, currentUser);
+  }
+
+  public SourceMigrator(AS400 system) throws Exception {
+    this(system, new AS400JDBCDataSource(system).getConnection(), true);
   }
 
   /* Main entry point of the migration process. */
@@ -401,7 +408,7 @@ public class SourceMigrator {
     String sourcePfParam = null;
 
     try {
-      SourceMigrator migrator = new SourceMigrator();
+      SourceMigrator migrator = new SourceMigrator(IBMiDotEnv.getNewSystemConnection(true));
 
       if (args.length > 0) {
         ifsOutputDirParam = args[0].trim();
