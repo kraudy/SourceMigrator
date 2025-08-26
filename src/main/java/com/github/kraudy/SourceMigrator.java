@@ -87,7 +87,7 @@ public class SourceMigrator {
       }
 
       long startTime = System.nanoTime();
-      migrateSourcePFs(querySourcePFs, ifsOutputDir);
+      migrateSourcePFs(querySourcePFs, ifsOutputDir, library);
 
       System.out.println("\nMigration completed.");
       System.out.println("Total Source PFs migrated: " + totalSourcePFsMigrated);
@@ -225,8 +225,7 @@ public class SourceMigrator {
         }
       }
       // Get specific Source PF
-      return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourcePf, " +
-          "SYSTEM_TABLE_SCHEMA AS Library " +
+      return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourcePf " +
           "FROM QSYS2. SYSPARTITIONSTAT " +
           "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
           "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
@@ -234,21 +233,19 @@ public class SourceMigrator {
           "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
     }
     // Get all Source PF
-    return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourcePf, " +
-        "SYSTEM_TABLE_SCHEMA AS Library " +
+    return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourcePf " +
         "FROM QSYS2. SYSPARTITIONSTAT " +
         "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
         "AND TRIM(SOURCE_TYPE) <> '' " +
         "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
   }
 
-  private void migrateSourcePFs(String querySourcePFs, String baseOutputDir) throws SQLException, IOException,
+  private void migrateSourcePFs(String querySourcePFs, String baseOutputDir, String library) throws SQLException, IOException,
       AS400SecurityException, ErrorCompletingRequestException, InterruptedException, PropertyVetoException {
     try (Statement stmt = connection.createStatement();
         ResultSet sourcePFs = stmt.executeQuery(querySourcePFs)) {
 
       while (sourcePFs.next()) {
-        String library = sourcePFs.getString("Library").trim();
         String sourcePf = sourcePFs.getString("SourcePf").trim();
         System.out.println("\n\nMigrating Source PF: " + sourcePf + " in library: " + library);
 
