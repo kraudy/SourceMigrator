@@ -6,7 +6,7 @@ Source PF are unique data structures of the IBM I Operating system, this means, 
 
 How to migrate thousands of source members with their corresponding dir struct (library/sourcePf/member) and correct character conversion to Stream Files in the IFS in a reasonable time without dealing with dependency issues in a download-and-run fashion and using only open-source tools?
 
-For that, I created **SourceMigrator**. It is a simple and minimal migration tool with a better than linear time for large code bases. If you look at the code, there is an obvious part where the migration could be made closer to O(log n). It can be run interactively without input params or non-interactively by specifying them.
+For that, I created **SourceMigrator**. It is a simple and minimal migration tool with a better than linear time for large code bases. It can be run interactively without input params or non-interactively by specifying them. You should also be able to add it as a package.
 
 ## Set up
 
@@ -22,7 +22,7 @@ Open PASE terminal with Code4i
 
 ![alt text](./images/open_terminal.png)
 
-Set terminal ccsid: `export QIBM_PASE_CCSID=1208`
+Set terminal ccsid: `export QIBM_PASE_CCSID=1208` *(Optional)*
 
 ![alt text](./images/set_ccsid.png)
 
