@@ -10,7 +10,6 @@ import com.ibm.as400.access.User;
 import io.github.theprez.dotenv_ibmi.IBMiDotEnv;
 
 import java.beans.PropertyVetoException;
-import java.io.File;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -43,6 +42,7 @@ public class SourceMigrator {
   private Scanner scanner; // TODO: Remove from here?
   private final boolean interactive;
   private CliHandler cliHandler;
+  private Utilities utilities;
 
   /*
    * Constructor initializes the AS400 connection and JDBC.
@@ -64,10 +64,15 @@ public class SourceMigrator {
     this.currentUser = new User(system, system.getUserId());
     this.currentUser.loadUserInformation();
 
+    // Utilities
+    this.utilities = new Utilities(connection, currentUser, interactive);
+
     // Input
     this.interactive = interactive;
     this.scanner = interactive ? new Scanner(System.in) : null;
-    this.cliHandler = interactive ? new CliHandler(scanner, connection, currentUser): null;
+    this.cliHandler = interactive ? new CliHandler(scanner, connection, currentUser, utilities): null;
+
+
   }
 
   /* Main entry point of the migration process. */
@@ -92,7 +97,7 @@ public class SourceMigrator {
       }
 
       ifsOutputDir = ifsOutputDir + "/" + library;
-      createDirectory(ifsOutputDir);
+      utilities.createDirectory(ifsOutputDir);
 
       String querySourcePFs = getSourcePFsQuery(sourcePfParam, libraryParam, library);
       if (querySourcePFs.isEmpty()) {
@@ -199,7 +204,7 @@ public class SourceMigrator {
         System.out.println("\n\nMigrating Source PF: " + sourcePf + " in library: " + library);
 
         String pfOutputDir = baseOutputDir + '/' + sourcePf;
-        createDirectory(pfOutputDir);
+        utilities.createDirectory(pfOutputDir);
 
         migrateMembers(library, sourcePf, pfOutputDir);
 
@@ -282,14 +287,6 @@ public class SourceMigrator {
       }
     }
     return "UNKNOWN";
-  }
-
-  private void createDirectory(String dirPath) {
-    File outputDir = new File(dirPath);
-    if (!outputDir.exists()) {
-      System.out.println("Creating dir: " + dirPath + " ...");
-      outputDir.mkdirs();
-    }
   }
 
   private void cleanup() {

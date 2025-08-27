@@ -13,11 +13,13 @@ public class CliHandler {
   private final Scanner scanner;
   private final Connection connection;
   private final User currentUser;
+  private final Utilities utilities;
 
-  public CliHandler(Scanner scanner, Connection connection, User currentUser) {
+  public CliHandler(Scanner scanner, Connection connection, User currentUser, Utilities utilities) {
     this.scanner = scanner;
     this.connection = connection;
     this.currentUser = currentUser;
+    this.utilities = utilities;
   }
 
   public String promptForOutputDirectory(String homeDir) throws IOException {
