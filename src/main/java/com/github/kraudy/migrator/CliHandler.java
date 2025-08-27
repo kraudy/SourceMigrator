@@ -1,4 +1,4 @@
-package com.github.kraudy;
+package com.github.kraudy.migrator;
 
 import com.ibm.as400.access.User;
 

@@ -1,4 +1,4 @@
-package com.github.kraudy;
+package com.github.kraudy.migrator;
 
 import com.ibm.as400.access.AS400;
 import com.ibm.as400.access.AS400SecurityException;
@@ -318,15 +318,15 @@ public class SourceMigrator {
     SourceMigrator migrator = null;
 
     try {
-      system = IBMiDotEnv.getNewSystemConnection(true);
+      system = IBMiDotEnv.getNewSystemConnection(true); // Get system
       
+      migrator = (args.length <= 1) ? new SourceMigrator(system, true): new SourceMigrator(system, false);
+
       if (args.length > 0) {
         ifsOutputDirParam = args[0].trim();
-        migrator = new SourceMigrator(system, true);
       }
       if (args.length > 1) {
         libraryParam = args[1].trim().toUpperCase();
-        migrator = new SourceMigrator(system, false);
       }
       if (args.length > 2) {
         sourcePfParam = args[2].trim().toUpperCase();
