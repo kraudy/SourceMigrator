@@ -79,4 +79,34 @@ public class Utilities {
         "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
   }
 
+  public String validateAndGetLibrary(String library) throws SQLException {
+    try (Statement validateStmt = connection.createStatement();
+        ResultSet validateRs = validateStmt.executeQuery(
+            "SELECT 1 AS Exists " +
+                "FROM QSYS2. SYSPARTITIONSTAT " +
+                "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' LIMIT 1")) {
+      if (!validateRs.next()) {
+        if (!interactive) throw new IllegalArgumentException("Library " + library + " does not exist in your system.");
+        
+        System.out.println(" *Library " + library + " does not exist in your system.");
+        // Show similar libs
+        try (Statement relatedStmt = connection.createStatement();
+            ResultSet relatedRs = relatedStmt.executeQuery(
+                "SELECT SYSTEM_TABLE_SCHEMA AS library " +
+                    "FROM QSYS2. SYSPARTITIONSTAT " +
+                    "WHERE SYSTEM_TABLE_SCHEMA LIKE '%" + library + "%' " +
+                    "GROUP BY SYSTEM_TABLE_SCHEMA LIMIT 10")) {
+          if (relatedRs.next()) {
+            System.out.println("Did you mean: ");
+            do {
+              System.out.println(relatedRs.getString("library").trim());
+            } while (relatedRs.next());
+          }
+        }
+        return "";
+      }
+    }
+    return library;
+  }
+
 }

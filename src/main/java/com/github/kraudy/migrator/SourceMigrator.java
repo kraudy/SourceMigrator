@@ -145,20 +145,7 @@ public class SourceMigrator {
       if (interactive) return cliHandler.promptForLibrary();
       throw new IllegalArgumentException("Library required in non-interactive mode");
     }
-    return validateLibraryNonInteractive(libraryParam);
-  }
-
-  private String validateLibraryNonInteractive(String library) throws SQLException {
-    try (Statement validateStmt = connection.createStatement();
-        ResultSet validateRs = validateStmt.executeQuery(
-            "SELECT 1 AS Exists " +
-                "FROM QSYS2. SYSPARTITIONSTAT " +
-                "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' LIMIT 1")) {
-      if (!validateRs.next()) {
-        throw new IllegalArgumentException("Library " + library + " does not exist in your system.");
-      }
-    }
-    return library;
+    return utilities.validateAndGetLibrary(libraryParam);
   }
 
   private String getSourcePFsQuery(String sourcePfParam, String libraryParam, String library)
