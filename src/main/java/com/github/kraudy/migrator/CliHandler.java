@@ -91,34 +91,10 @@ public class CliHandler {
           "Specify the name of a source PF or press <Enter> to migrate all the source PFs in library: ",
           "");
 
-      query = getSourcePFs(sourcePf, library);
+      query = utilities.getSourcePFs(sourcePf, library);
     }
 
     return query;
-  }
-
-  private String getSourcePFs(String sourcePf, String library) throws SQLException {
-    if (!sourcePf.isEmpty()) {
-      // Validate if Source PF exists
-      try (Statement validateStmt = connection.createStatement();
-          ResultSet validateRs = validateStmt.executeQuery(
-              "SELECT 1 AS Exist FROM QSYS2. SYSPARTITIONSTAT " +
-                  "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
-                  "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
-                  "AND TRIM(SOURCE_TYPE) <> '' LIMIT 1")) {
-        if (!validateRs.next()) {
-          System.out.println(" *Source PF " + sourcePf + " does not exist in library " + library);
-          return "";
-        }
-      }
-    }
-    // Get specific or all Source PF
-    return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourcePf " +
-        "FROM QSYS2. SYSPARTITIONSTAT " +
-        "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
-        (sourcePf.isEmpty() ? "" : "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' ") +
-        "AND TRIM(SOURCE_TYPE) <> '' " +
-        "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
   }
 
   private void showSourcePFs(String library) throws SQLException {

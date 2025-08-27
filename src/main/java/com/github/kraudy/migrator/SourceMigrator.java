@@ -80,10 +80,10 @@ public class SourceMigrator {
     try {
       System.out.println("User: " + system.getUserId().trim().toUpperCase());
 
-      String systemName = getSystemName();
+      String systemName = utilities.getSystemName();
       System.out.println("System: " + systemName);
 
-      String systemCcsid = getCcsid();
+      String systemCcsid = utilities.getCcsid();
       System.out.println("System's CCSID: " + systemCcsid);
 
       String ifsOutputDir = getOutputDirectory(ifsOutputDirParam);
@@ -165,33 +165,10 @@ public class SourceMigrator {
       throws IOException, SQLException {
     if (sourcePfParam == null){
       if (interactive) return cliHandler.promptForSourcePFs(library);;
-      return getSourcePFsNonInteractive("", library); // Get all source pf in library
+      return utilities.getSourcePFs("", library); // Get all source pf in library
     }
-    return getSourcePFsNonInteractive(sourcePfParam, library); // Get specific source pf in library
+    return utilities.getSourcePFs(sourcePfParam, library); // Get specific source pf in library
 
-  }
-
-  private String getSourcePFsNonInteractive(String sourcePf, String library) throws SQLException {
-    if (!sourcePf.isEmpty()) {
-      // Validate if Source PF exists
-      try (Statement validateStmt = connection.createStatement();
-          ResultSet validateRs = validateStmt.executeQuery(
-              "SELECT 1 AS Exist FROM QSYS2. SYSPARTITIONSTAT " +
-                  "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
-                  "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
-                  "AND TRIM(SOURCE_TYPE) <> '' LIMIT 1")) {
-        if (!validateRs.next()) {
-          throw new IllegalArgumentException("Source PF " + sourcePf + " does not exist in library " + library);
-        }
-      }
-    }
-    // Get specific or all Source PF
-    return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourcePf " +
-        "FROM QSYS2. SYSPARTITIONSTAT " +
-        "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
-        (sourcePf.isEmpty() ? "" : "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' ") +
-        "AND TRIM(SOURCE_TYPE) <> '' " +
-        "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
   }
 
   private void migrateSourcePFs(String querySourcePFs, String baseOutputDir, String library) throws SQLException, IOException,
@@ -267,27 +244,6 @@ public class SourceMigrator {
     });
   }
 
-  private String getCcsid() throws SQLException {
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery(
-            "Select CCSID From QSYS2. SYSCOLUMNS WHERE TABLE_NAME = 'SYSPARTITIONSTAT'" +
-                "And TABLE_SCHEMA = 'QSYS2' And COLUMN_NAME = 'SYSTEM_TABLE_NAME' ")) {
-      if (rs.next()) {
-        return rs.getString("CCSID").trim();
-      }
-    }
-    return "";
-  }
-
-  private String getSystemName() throws SQLException {
-    try (Statement stmt = connection.createStatement();
-        ResultSet rs = stmt.executeQuery("SELECT CURRENT_SERVER AS Server FROM SYSIBM. SYSDUMMY1")) {
-      if (rs.next()) {
-        return rs.getString("Server").trim();
-      }
-    }
-    return "UNKNOWN";
-  }
 
   private void cleanup() {
     try {
