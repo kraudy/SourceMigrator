@@ -1,6 +1,4 @@
-package com.github;
-
-import com.github.kraudy.SourceMigrator;
+package com.github.kraudy;
 
 import com.ibm.as400.access.User;
 
