@@ -65,7 +65,7 @@ public class SourceMigrator {
     this.currentUser.loadUserInformation();
 
     // Utilities
-    this.utilities = new Utilities(connection, currentUser, interactive);
+    this.utilities = new Utilities(connection, interactive);
 
     // Input
     this.interactive = interactive;
