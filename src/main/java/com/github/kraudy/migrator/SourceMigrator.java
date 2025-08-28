@@ -21,6 +21,10 @@ import java.util.Scanner;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Parameters;
+
 /**
  * Migrates IBM i source physical files to IFS stream files.
  * @param ifsOutputDirParam IFS output directory (absolute or relative to home). Required in non-interactive mode.
@@ -30,7 +34,8 @@ import java.util.concurrent.TimeUnit;
  * @throws Exception on connection or migration failures.
  */
 
-public class SourceMigrator {
+@Command(name = "migrator", description = "Migrates IBM i source physical files to IFS stream files.", mixinStandardHelpOptions = true)
+public class SourceMigrator implements Runnable{
   private static final String UTF8_CCSID = "1208"; // UTF-8 for stream files
   public static final String INVARIANT_CCSID = "37"; // EBCDIC
   private final AS400 system;
@@ -40,20 +45,24 @@ public class SourceMigrator {
   private int totalMembersMigrated = 0;
   private int migrationErrors = 0;
   private Scanner scanner; // TODO: Remove from here?
-  private final boolean interactive;
+  private boolean interactive; //TODO: Is removing final a good idea? I would preffer it to be created in the constructor
   private CliHandler cliHandler;
   private Utilities utilities;
+
+  @Parameters(arity = "0..*", description = "<output_dir> <library> [source_pf]", paramLabel = "<args>")
+  private List<String> parameters;
 
   /*
    * Constructor initializes the AS400 connection and JDBC.
    * 
    * @throws Exception if connection fails
    */
-  public SourceMigrator(AS400 system, boolean interactive) throws Exception {
-    this(system, new AS400JDBCDataSource(system).getConnection(), interactive);
+
+   public SourceMigrator(AS400 system) throws Exception {
+    this(system, new AS400JDBCDataSource(system).getConnection());
   }
 
-  public SourceMigrator(AS400 system, Connection connection, boolean interactive) throws Exception {
+  public SourceMigrator(AS400 system, Connection connection) throws Exception {
     this.system = system;
 
     // Database
@@ -63,16 +72,41 @@ public class SourceMigrator {
     // User
     this.currentUser = new User(system, system.getUserId());
     this.currentUser.loadUserInformation();
+  }
 
-    // Utilities
-    this.utilities = new Utilities(connection, interactive);
+  public SourceMigrator(AS400 system, boolean interactive) throws Exception {
+    this(system);
+    initInteractive(interactive);
+  }
 
-    // Input
+  public SourceMigrator(AS400 system, Connection connection, boolean interactive) throws Exception {
+    this(system, connection);
+    initInteractive(interactive);
+  }
+
+  private void initInteractive(boolean interactive) {
     this.interactive = interactive;
+    this.utilities = new Utilities(connection, interactive);
     this.scanner = interactive ? new Scanner(System.in) : null;
-    this.cliHandler = interactive ? new CliHandler(scanner, connection, currentUser, utilities): null;
+    this.cliHandler = interactive ? new CliHandler(scanner, connection, currentUser, utilities) : null;
+  }
 
+  @Override
+  public void run() {
+    try {
+      boolean calculatedInteractive = (parameters == null || parameters.size() <= 1);
+      initInteractive(calculatedInteractive);
 
+      String ifsOutputDirParam = (parameters != null && !parameters.isEmpty()) ? parameters.get(0).trim() : null;
+      String libraryParam = (parameters != null && parameters.size() > 1) ? parameters.get(1).trim().toUpperCase() : null;
+      String sourcePfParam = (parameters != null && parameters.size() > 2) ? parameters.get(2).trim().toUpperCase() : null;
+
+      migrate(ifsOutputDirParam, libraryParam, sourcePfParam);
+    } catch (Exception e) {
+      e.printStackTrace();
+    } finally {
+      cleanup();
+    }
   }
 
   /* Main entry point of the migration process. */
@@ -251,28 +285,14 @@ public class SourceMigrator {
   }
 
   public static void main(String... args) {
-    String ifsOutputDirParam = null;
-    String libraryParam = null;
-    String sourcePfParam = null;
     AS400 system = null;
     SourceMigrator migrator = null;
 
     try {
       system = IBMiDotEnv.getNewSystemConnection(true); // Get system
       
-      migrator = (args.length <= 1) ? new SourceMigrator(system, true): new SourceMigrator(system, false);
-
-      if (args.length > 0) {
-        ifsOutputDirParam = args[0].trim();
-      }
-      if (args.length > 1) {
-        libraryParam = args[1].trim().toUpperCase();
-      }
-      if (args.length > 2) {
-        sourcePfParam = args[2].trim().toUpperCase();
-      }
-
-      migrator.migrate(ifsOutputDirParam, libraryParam, sourcePfParam);
+      migrator = new SourceMigrator(system);
+      new CommandLine(migrator).execute(args);
 
     } catch (Exception e) {
       e.printStackTrace();
