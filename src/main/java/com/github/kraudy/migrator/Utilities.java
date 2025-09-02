@@ -73,13 +73,15 @@ public class Utilities {
         "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
   }
 
-  public String validateAndGetLibrary(String library) throws SQLException {
+  // TODO: Add params validation to this class
+  public String validateLibrary(String library) throws SQLException {
     try (Statement validateStmt = connection.createStatement();
         ResultSet validateRs = validateStmt.executeQuery(
             "SELECT 1 AS Exists " +
                 "FROM QSYS2. SYSPARTITIONSTAT " +
                 "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' LIMIT 1")) {
       if (!validateRs.next()) {
+        //if (!verbose) throw new IllegalArgumentException("Library " + library + " does not exist in your system.");
         if (!interactive) throw new IllegalArgumentException("Library " + library + " does not exist in your system.");
         
         System.out.println(" *Library " + library + " does not exist in your system.");

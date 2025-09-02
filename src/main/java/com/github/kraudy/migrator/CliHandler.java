@@ -47,7 +47,7 @@ public class CliHandler {
           library = "";
         }
       } else {
-        library = utilities.validateAndGetLibrary(library);
+        library = utilities.validateLibrary(library);
       }
     }
 

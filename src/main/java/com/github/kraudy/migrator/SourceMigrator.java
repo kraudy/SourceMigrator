@@ -140,14 +140,15 @@ public class SourceMigrator implements Runnable{
   public void run() {
     try {
       outDir = getOutputDirectory(outDir); // Validate source dir
-      //TODO: Add libraryList validation
+      
+      libraryList = getLibrary(libraryList.stream().distinct().collect(Collectors.toList())); // Validate library list
+
       boolean calculatedInteractive = (parameters == null || parameters.size() <= 1);
       initInteractive(calculatedInteractive);
 
-      String libraryParam = (parameters != null && parameters.size() > 1) ? parameters.get(1).trim().toUpperCase() : null;
       String sourcePfParam = (parameters != null && parameters.size() > 2) ? parameters.get(2).trim().toUpperCase() : null;
 
-      migrate(outDir, libraryParam, sourcePfParam);
+      migrate(outDir, libraryList.get(0), sourcePfParam);
     } catch (Exception e) {
       e.printStackTrace();
     } finally {
@@ -166,22 +167,16 @@ public class SourceMigrator implements Runnable{
       String systemCcsid = utilities.getCcsid();
       System.out.println("System's CCSID: " + systemCcsid);
 
-
-      String library = getLibrary(libraryParam);
-      if (library.isEmpty()) {
-        return;
-      }
-
-      ifsOutputDir = ifsOutputDir + "/" + library;
+      ifsOutputDir = ifsOutputDir + "/" + libraryParam;
       utilities.createDirectory(ifsOutputDir);
 
-      String querySourcePFs = getSourcePFsQuery(sourcePfParam, libraryParam, library);
+      String querySourcePFs = getSourcePFsQuery(sourcePfParam, libraryParam, libraryParam);
       if (querySourcePFs.isEmpty()) {
         return;
       }
 
       long startTime = System.nanoTime();
-      migrateSourcePFs(querySourcePFs, ifsOutputDir, library);
+      migrateSourcePFs(querySourcePFs, ifsOutputDir, libraryParam);
 
       System.out.println("\nMigration completed.");
       System.out.println("Total Source PFs migrated: " + totalSourcePFsMigrated);
@@ -213,12 +208,12 @@ public class SourceMigrator implements Runnable{
     return homeDir + "/" + outDir; // Relative path
   }
 
-  private String getLibrary(String libraryParam) throws IOException, SQLException {
-    if (libraryParam == null) {
-      if (interactive) return cliHandler.promptForLibrary();
-      throw new IllegalArgumentException("Library required in non-interactive mode");
+  //TODO: This could be done only using validateLibrary
+  private List<String> getLibrary(List<String> libraryList) throws IOException, SQLException {
+    for(String library: libraryList){
+      utilities.validateLibrary(library);
     }
-    return utilities.validateAndGetLibrary(libraryParam);
+    return libraryList;
   }
 
   private String getSourcePFsQuery(String sourcePfParam, String libraryParam, String library)
