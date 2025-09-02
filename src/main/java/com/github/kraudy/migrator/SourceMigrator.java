@@ -50,11 +50,22 @@ public class SourceMigrator implements Runnable{
   private CliHandler cliHandler;
   private Utilities utilities;
 
+  static class outDirConverter implements CommandLine.ITypeConverter<String> {
+    @Override
+    public String convert(String outDir) throws Exception {
+      try {
+        return outDir.trim();
+      } catch (IllegalArgumentException e) {
+        throw new CommandLine.TypeConversionException("Invalid object name: '" + outDir);
+      }
+    }
+  }
+
   @Option(names = { "-l", "--libs" }, required = true, arity = "1..*", description = "Library list to scan")
   private List<String> libraryList = new ArrayList<>();
 
-  @Option(names = "-o", description = "Sources destination")
-  private String outDir = null;
+  @Option(names = "-o", description = "Sources destination", converter = outDirConverter.class)
+  private String outDir = "sources";
 
   @Option(names = "--pf", description = "Source Phisical File")
   private String sourcePf = null;
@@ -116,14 +127,14 @@ public class SourceMigrator implements Runnable{
   @Override
   public void run() {
     try {
+      outDir = getOutputDirectory(outDir); // Validate source dir
       boolean calculatedInteractive = (parameters == null || parameters.size() <= 1);
       initInteractive(calculatedInteractive);
 
-      String ifsOutputDirParam = (parameters != null && !parameters.isEmpty()) ? parameters.get(0).trim() : null;
       String libraryParam = (parameters != null && parameters.size() > 1) ? parameters.get(1).trim().toUpperCase() : null;
       String sourcePfParam = (parameters != null && parameters.size() > 2) ? parameters.get(2).trim().toUpperCase() : null;
 
-      migrate(ifsOutputDirParam, libraryParam, sourcePfParam);
+      migrate(outDir, libraryParam, sourcePfParam);
     } catch (Exception e) {
       e.printStackTrace();
     } finally {
@@ -132,7 +143,7 @@ public class SourceMigrator implements Runnable{
   }
 
   /* Main entry point of the migration process. */
-  public void migrate(String ifsOutputDirParam, String libraryParam, String sourcePfParam) {
+  public void migrate(String ifsOutputDir, String libraryParam, String sourcePfParam) {
     try {
       System.out.println("User: " + system.getUserId().trim().toUpperCase());
 
@@ -142,10 +153,6 @@ public class SourceMigrator implements Runnable{
       String systemCcsid = utilities.getCcsid();
       System.out.println("System's CCSID: " + systemCcsid);
 
-      String ifsOutputDir = getOutputDirectory(ifsOutputDirParam);
-      if (ifsOutputDir.isEmpty()) {
-        return;
-      }
 
       String library = getLibrary(libraryParam);
       if (library.isEmpty()) {
@@ -176,24 +183,20 @@ public class SourceMigrator implements Runnable{
     }
   }
 
-  private String getOutputDirectory(String ifsOutputDirParam) throws IOException {
+  private String getOutputDirectory(String outDir) throws IOException {
+    if (outDir.startsWith("/")) {
+      return outDir; // Full path
+    }
+
     String homeDir = currentUser.getHomeDirectory(); // Needed for relative path
     if (homeDir == null || homeDir.isEmpty()) {
-      // TODO: homeDir = "/tmp"; // Fallback? for interactive and non?
-      if (interactive){
-        System.out.println(" *The current user has no home directory.");
-        return "";  
-      }
-      throw new IllegalArgumentException("The current user has no home directory.");
+      homeDir = "/tmp"; // Fallback
+      if (verbose) System.out.println(" *The current user has no home directory.");
+      //TODO: Add param for this, like something to make it crash, maybe -x? or some default params
+      //throw new IllegalArgumentException("The current user has no home directory.");
     }
-    if (ifsOutputDirParam == null) {
-      if (interactive) return cliHandler.promptForOutputDirectory(homeDir); // Prompt for path
-      throw new IllegalArgumentException("Output directory required in non-interactive mode");
-    }
-    if (ifsOutputDirParam.startsWith("/")) {
-      return ifsOutputDirParam; // Full path
-    }
-    return homeDir + "/" + ifsOutputDirParam; // Relative path
+
+    return homeDir + "/" + outDir; // Relative path
   }
 
   private String getLibrary(String libraryParam) throws IOException, SQLException {
