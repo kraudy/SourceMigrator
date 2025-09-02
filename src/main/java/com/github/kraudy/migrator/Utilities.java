@@ -48,21 +48,8 @@ public class Utilities {
     return "";
   }
 
+  //TODO: Overload this thing
   public String getSourcePFs(String sourcePf, String library) throws SQLException {
-    if (!sourcePf.isEmpty()) {
-      // Validate if Source PF exists
-      try (Statement validateStmt = connection.createStatement();
-          ResultSet validateRs = validateStmt.executeQuery(
-              "SELECT 1 AS Exist FROM QSYS2. SYSPARTITIONSTAT " +
-                  "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
-                  "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
-                  "AND TRIM(SOURCE_TYPE) <> '' LIMIT 1")) {
-        if (!validateRs.next()) {
-          if (verbose) System.err.println(" *Source PF " + sourcePf + " does not exist in library " + library);      
-          throw new IllegalArgumentException("Source PF " + sourcePf + " does not exist in library " + library);
-        }
-      }
-    }
     //TODO: Validate using SYSTABLES 
     // Get specific or all Source PF
     return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourcePf " +

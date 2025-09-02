@@ -33,22 +33,8 @@ public class CliHandler {
     return sourceDir.isEmpty() ? defaultDir : homeDir + "/" + sourceDir; // Relative path
   }
 
-  public String promptForSourcePFs(String library) throws IOException, SQLException {
-    showSourcePFs(library); // Show list of source pfs
-    String query = "";
-
-    while (query.isEmpty()) {
-      String sourcePf = prompt(
-          "Specify the name of a source PF or press <Enter> to migrate all the source PFs in library: ",
-          "");
-
-      query = utilities.getSourcePFs(sourcePf, library);
-    }
-
-    return query;
-  }
-
-  private void showSourcePFs(String library) throws SQLException {
+  //TODO: Move to utilities
+  public void showSourcePFs(String library) throws SQLException {
     int total = 0;
     try (Statement stmt = connection.createStatement();
         ResultSet rs = stmt.executeQuery(

@@ -76,6 +76,13 @@ public class SourceMigrator implements Runnable{
   @Option(names = { "-l", "--libs" }, required = true, arity = "1..*", description = "Library list to scan", converter = libraryConverter.class)
   private List<String> libraryList = new ArrayList<>();
 
+  /* 
+  @Option(names = {"-a", "--all"}, description = "Migrate all sources")
+  private boolean all = false;
+
+  @Option(names = {"-u", "--update"}, description = "Migrate only sources with change")
+  private boolean update = false;
+  */
   @Option(names = "-o", description = "Sources destination", converter = outDirConverter.class)
   private String outDir = "sources";
 
@@ -141,23 +148,25 @@ public class SourceMigrator implements Runnable{
     try {
       outDir = getOutputDirectory(outDir); // Validate source dir
       
-      libraryList = getLibrary(libraryList.stream().distinct().collect(Collectors.toList())); // Validate library list
+      libraryList = getLibrary(libraryList.stream().distinct().collect(Collectors.toList()), outDir); // Validate library list
 
       boolean calculatedInteractive = (parameters == null || parameters.size() <= 1);
       initInteractive(calculatedInteractive);
 
+      //TODO: I should validate if sourcePf exist for each library here before getting the query
+      if (sourcePf != null) validateSourcePFs(sourcePf, libraryList.get(0));
+
+      //TODO: Add verbose validation
       System.out.println("User: " + system.getUserId().trim().toUpperCase());
-
       System.out.println("System: " + utilities.getSystemName());
-
       System.out.println("System's CCSID: " + utilities.getCcsid());
 
-      //TODO: Create here the dirs for all the libs. Maybe they could be created inside getLibrary()?
-      outDir = outDir + "/" + libraryList.get(0);
-      utilities.createDirectory(outDir);
+      // for () {}
+      //TODO: This would go inside the same for loop as migrate()
+      String querySourcePFs = getSourcePFsQuery(libraryList.get(0), libraryList.get(0));
 
       // TODO: This could be colled once for every library in the list
-      migrate(outDir, libraryList.get(0), sourcePf);
+      migrate(querySourcePFs, outDir + "/" + libraryList.get(0), libraryList.get(0), sourcePf);
 
     } catch (Exception e) {
       e.printStackTrace();
@@ -167,12 +176,8 @@ public class SourceMigrator implements Runnable{
   }
 
   /* Main entry point of the migration process. */
-  public void migrate(String ifsOutputDir, String libraryParam, String sourcePfParam) {
+  public void migrate(String querySourcePFs, String ifsOutputDir, String libraryParam, String sourcePfParam) {
     try {
-      String querySourcePFs = getSourcePFsQuery(sourcePfParam, libraryParam, libraryParam);
-      if (querySourcePFs.isEmpty()) {
-        return;
-      }
 
       //TODO: Move this out to run()
       long startTime = System.nanoTime();
@@ -212,20 +217,38 @@ public class SourceMigrator implements Runnable{
   }
 
   //TODO: This could be done only using validateLibrary
-  private List<String> getLibrary(List<String> libraryList) throws IOException, SQLException {
+  private List<String> getLibrary(List<String> libraryList, String outDir) throws IOException, SQLException {
     for(String library: libraryList){
-      utilities.validateLibrary(library);
+      utilities.validateLibrary(library); // Validate if library exist
+      utilities.createDirectory(outDir + "/" + library); // Create dir for library
     }
     return libraryList;
   }
 
-  private String getSourcePFsQuery(String sourcePfParam, String libraryParam, String library)
-      throws IOException, SQLException {
-    if (sourcePfParam == null){
-      if (interactive) return cliHandler.promptForSourcePFs(library);;
-      return utilities.getSourcePFs("", library); // Get all source pf in library
+  private void validateSourcePFs(String sourcePf, String library) throws SQLException{
+    // Validate if Source PF exists
+    try (Statement validateStmt = connection.createStatement();
+        ResultSet validateRs = validateStmt.executeQuery(
+            "SELECT 1 AS Exist FROM QSYS2. SYSPARTITIONSTAT " +
+                "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
+                "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
+                "AND TRIM(SOURCE_TYPE) <> '' LIMIT 1")) {
+      if (!validateRs.next()) {
+        if (verbose) {
+          System.err.println(" *Source PF " + sourcePf + " does not exist in library " + library);
+          //Show available source PF in library
+          cliHandler.showSourcePFs(library);
+        }
+        throw new IllegalArgumentException("Source PF " + sourcePf + " does not exist in library " + library);
+      }
     }
-    return utilities.getSourcePFs(sourcePfParam, library); // Get specific source pf in library
+  }
+
+  private String getSourcePFsQuery(String libraryParam, String library)
+      throws IOException, SQLException {
+    if (sourcePf == null) return utilities.getSourcePFs("", library); // Get all source pf in library
+    
+    return utilities.getSourcePFs(sourcePf, library); // Get specific source pf in library
 
   }
 
