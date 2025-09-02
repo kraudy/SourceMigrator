@@ -131,7 +131,7 @@ public class SourceMigrator implements Runnable{
 
   private void initInteractive(boolean interactive) {
     this.interactive = interactive;
-    this.utilities = new Utilities(connection, interactive);
+    this.utilities = new Utilities(connection, verbose);
     this.scanner = interactive ? new Scanner(System.in) : null;
     this.cliHandler = interactive ? new CliHandler(scanner, connection, currentUser, utilities) : null;
   }
@@ -146,9 +146,19 @@ public class SourceMigrator implements Runnable{
       boolean calculatedInteractive = (parameters == null || parameters.size() <= 1);
       initInteractive(calculatedInteractive);
 
-      String sourcePfParam = (parameters != null && parameters.size() > 2) ? parameters.get(2).trim().toUpperCase() : null;
+      System.out.println("User: " + system.getUserId().trim().toUpperCase());
 
-      migrate(outDir, libraryList.get(0), sourcePfParam);
+      System.out.println("System: " + utilities.getSystemName());
+
+      System.out.println("System's CCSID: " + utilities.getCcsid());
+
+      //TODO: Create here the dirs for all the libs. Maybe they could be created inside getLibrary()?
+      outDir = outDir + "/" + libraryList.get(0);
+      utilities.createDirectory(outDir);
+
+      // TODO: This could be colled once for every library in the list
+      migrate(outDir, libraryList.get(0), sourcePf);
+
     } catch (Exception e) {
       e.printStackTrace();
     } finally {
@@ -159,25 +169,18 @@ public class SourceMigrator implements Runnable{
   /* Main entry point of the migration process. */
   public void migrate(String ifsOutputDir, String libraryParam, String sourcePfParam) {
     try {
-      System.out.println("User: " + system.getUserId().trim().toUpperCase());
-
-      String systemName = utilities.getSystemName();
-      System.out.println("System: " + systemName);
-
-      String systemCcsid = utilities.getCcsid();
-      System.out.println("System's CCSID: " + systemCcsid);
-
-      ifsOutputDir = ifsOutputDir + "/" + libraryParam;
-      utilities.createDirectory(ifsOutputDir);
-
       String querySourcePFs = getSourcePFsQuery(sourcePfParam, libraryParam, libraryParam);
       if (querySourcePFs.isEmpty()) {
         return;
       }
 
+      //TODO: Move this out to run()
       long startTime = System.nanoTime();
+
+      //TODO: Maybe this migrateSourcePFs() is not neccesary and i can do it directly here using migrate()
       migrateSourcePFs(querySourcePFs, ifsOutputDir, libraryParam);
 
+      //TODO: Move this out to run()
       System.out.println("\nMigration completed.");
       System.out.println("Total Source PFs migrated: " + totalSourcePFsMigrated);
       System.out.println("Total members migrated: " + totalMembersMigrated);
@@ -200,7 +203,7 @@ public class SourceMigrator implements Runnable{
     String homeDir = currentUser.getHomeDirectory(); // Needed for relative path
     if (homeDir == null || homeDir.isEmpty()) {
       homeDir = "/tmp"; // Fallback
-      if (verbose) System.out.println(" *The current user has no home directory.");
+      if (verbose) System.err.println(" *The current user has no home directory. Default to '/tmp'");
       //TODO: Add param for this, like something to make it crash, maybe -x? or some default params
       //throw new IllegalArgumentException("The current user has no home directory.");
     }

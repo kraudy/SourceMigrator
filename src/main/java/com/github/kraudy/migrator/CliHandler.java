@@ -33,27 +33,6 @@ public class CliHandler {
     return sourceDir.isEmpty() ? defaultDir : homeDir + "/" + sourceDir; // Relative path
   }
 
-  public String promptForLibrary() throws IOException, SQLException {
-    String library = "";
-    while (library.isEmpty()) {
-      library = prompt(
-          "Specify the name of a library or press <Enter> to search for Source PFs in the current library:",
-          currentUser.getCurrentLibraryName());
-
-      if (library.isEmpty()) {
-        library = currentUser.getCurrentLibraryName();
-        if (library == null || "*CRTDFT".equals(library)) {
-          System.out.println("The user does not have a current library");
-          library = "";
-        }
-      } else {
-        library = utilities.validateLibrary(library);
-      }
-    }
-
-    return library;
-  }
-
   public String promptForSourcePFs(String library) throws IOException, SQLException {
     showSourcePFs(library); // Show list of source pfs
     String query = "";

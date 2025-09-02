@@ -8,19 +8,22 @@ import java.io.File;
 
 public class Utilities {
   private final Connection connection;
-  private final boolean interactive;
+  private final boolean verbose;
 
-  public Utilities(Connection connection, boolean interactive) {
+  public Utilities(Connection connection, boolean verbose) {
     this.connection = connection;
-    this.interactive = interactive;
+    this.verbose = verbose;
   }
 
   public void createDirectory(String dirPath) {
+    //TODO: Change to jt400 IFSFile
     File outputDir = new File(dirPath);
-    if (!outputDir.exists()) {
-      System.out.println("Creating dir: " + dirPath + " ...");
-      outputDir.mkdirs();
+    if (outputDir.exists()) {
+      if (verbose) System.err.println(" *Dir already exists: " + dirPath + " ...");
+      return;
     }
+    if (verbose) System.out.println("Creating dir: " + dirPath + " ...");
+    outputDir.mkdirs();
   }
 
   public String getSystemName() throws SQLException {
@@ -55,10 +58,7 @@ public class Utilities {
                   "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
                   "AND TRIM(SOURCE_TYPE) <> '' LIMIT 1")) {
         if (!validateRs.next()) {
-          if (interactive) {
-            System.out.println(" *Source PF " + sourcePf + " does not exist in library " + library);
-            return "";
-          }
+          if (verbose) System.err.println(" *Source PF " + sourcePf + " does not exist in library " + library);      
           throw new IllegalArgumentException("Source PF " + sourcePf + " does not exist in library " + library);
         }
       }
@@ -74,35 +74,35 @@ public class Utilities {
   }
 
   // TODO: Add params validation to this class
-  public String validateLibrary(String library) throws SQLException {
+  public void validateLibrary(String library) throws SQLException {
     try (Statement validateStmt = connection.createStatement();
         ResultSet validateRs = validateStmt.executeQuery(
             "SELECT 1 AS Exists " +
                 "FROM QSYS2. SYSPARTITIONSTAT " +
                 "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' LIMIT 1")) {
       if (!validateRs.next()) {
-        //if (!verbose) throw new IllegalArgumentException("Library " + library + " does not exist in your system.");
-        if (!interactive) throw new IllegalArgumentException("Library " + library + " does not exist in your system.");
-        
-        System.out.println(" *Library " + library + " does not exist in your system.");
-        // Show similar libs
-        try (Statement relatedStmt = connection.createStatement();
-            ResultSet relatedRs = relatedStmt.executeQuery(
-                "SELECT SYSTEM_TABLE_SCHEMA AS library " +
-                    "FROM QSYS2. SYSPARTITIONSTAT " +
-                    "WHERE SYSTEM_TABLE_SCHEMA LIKE '%" + library + "%' " +
-                    "GROUP BY SYSTEM_TABLE_SCHEMA LIMIT 10")) {
-          if (relatedRs.next()) {
-            System.out.println("Did you mean: ");
-            do {
-              System.out.println(relatedRs.getString("library").trim());
-            } while (relatedRs.next());
+        //TODO: Change err ouptut to something usefule
+        if (verbose) {
+          System.err.println(" *Library " + library + " does not exist in your system.");
+          // Show similar libs
+          try (Statement relatedStmt = connection.createStatement();
+              ResultSet relatedRs = relatedStmt.executeQuery(
+                  "SELECT SYSTEM_TABLE_SCHEMA AS library " +
+                      "FROM QSYS2. SYSPARTITIONSTAT " +
+                      "WHERE SYSTEM_TABLE_SCHEMA LIKE '%" + library + "%' " +
+                      "GROUP BY SYSTEM_TABLE_SCHEMA LIMIT 10")) {
+            if (relatedRs.next()) {
+              System.err.println("Did you mean: ");
+              do {
+                System.err.println(relatedRs.getString("library").trim());
+              } while (relatedRs.next());
+            }
           }
         }
-        return "";
+        throw new IllegalArgumentException("Library " + library + " does not exist in your system.");
       }
     }
-    return library;
+    return;
   }
 
 }
