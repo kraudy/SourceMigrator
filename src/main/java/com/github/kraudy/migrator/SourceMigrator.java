@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -61,7 +62,18 @@ public class SourceMigrator implements Runnable{
     }
   }
 
-  @Option(names = { "-l", "--libs" }, required = true, arity = "1..*", description = "Library list to scan")
+  static class libraryConverter implements CommandLine.ITypeConverter<String> {
+    @Override
+    public String convert(String library) throws Exception {
+      try {
+        return library.trim().toUpperCase();
+      } catch (IllegalArgumentException e) {
+        throw new CommandLine.TypeConversionException("Invalid libraries: '" + library);
+      }
+    }
+  }
+
+  @Option(names = { "-l", "--libs" }, required = true, arity = "1..*", description = "Library list to scan", converter = libraryConverter.class)
   private List<String> libraryList = new ArrayList<>();
 
   @Option(names = "-o", description = "Sources destination", converter = outDirConverter.class)
@@ -128,6 +140,7 @@ public class SourceMigrator implements Runnable{
   public void run() {
     try {
       outDir = getOutputDirectory(outDir); // Validate source dir
+      //TODO: Add libraryList validation
       boolean calculatedInteractive = (parameters == null || parameters.size() <= 1);
       initInteractive(calculatedInteractive);
 
@@ -183,6 +196,7 @@ public class SourceMigrator implements Runnable{
     }
   }
 
+  //TODO: Move to utils
   private String getOutputDirectory(String outDir) throws IOException {
     if (outDir.startsWith("/")) {
       return outDir; // Full path
