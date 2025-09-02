@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
 /**
@@ -49,8 +50,29 @@ public class SourceMigrator implements Runnable{
   private CliHandler cliHandler;
   private Utilities utilities;
 
+  @Option(names = { "-l", "--libs" }, required = true, arity = "1..*", description = "Library list to scan")
+  private List<String> libraryList = new ArrayList<>();
+
+  @Option(names = "-o", description = "Sources destination")
+  private String outDir = null;
+
+  @Option(names = "--pf", description = "Source Phisical File")
+  private String sourcePf = null;
+
   @Parameters(arity = "0..*", description = "<output_dir> <library> [source_pf]", paramLabel = "<args>")
   private List<String> parameters;
+
+  @Option(names = "-x", description = "Debug")
+  private boolean debug = false;
+
+  @Option(names = "-v", description = "Verbose output")
+  private boolean verbose = false;
+
+  @Option(names = "--json", description = "Output as JSON")
+  private boolean jsonOutput = false;
+
+  @Option(names = { "-h", "--help" }, usageHelp = true, description = "Builds dependency graph for IBM i objects")
+  private boolean helpRequested = false;
 
   /*
    * Constructor initializes the AS400 connection and JDBC.

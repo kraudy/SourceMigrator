@@ -63,6 +63,7 @@ public class Utilities {
         }
       }
     }
+    //TODO: Validate using SYSTABLES 
     // Get specific or all Source PF
     return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourcePf " +
         "FROM QSYS2. SYSPARTITIONSTAT " +
