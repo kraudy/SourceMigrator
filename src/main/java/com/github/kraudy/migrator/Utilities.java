@@ -117,6 +117,9 @@ public class Utilities {
   }
 
   public void validateSourcePFs(String sourcePf, String library) throws SQLException{
+    //TODO: Fix this
+    if (sourcePf.equals("")) return;
+
     // Validate if Source PF exists
     try (Statement validateStmt = connection.createStatement();
         ResultSet validateRs = validateStmt.executeQuery(

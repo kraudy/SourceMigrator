@@ -82,6 +82,7 @@ public class SourceMigrator implements Runnable{
   @Option(names = "-o", description = "Sources destination", converter = outDirConverter.class)
   private String outDir = "sources";
 
+  //TODO: I'm still not sure how this should relate to the library list
   @Option(names = "--pf", description = "Source Phisical File")
   private String sourcePf = "";
 
@@ -94,7 +95,7 @@ public class SourceMigrator implements Runnable{
   @Option(names = "--json", description = "Output as JSON")
   private boolean jsonOutput = false;
 
-  @Option(names = { "-h", "--help" }, usageHelp = true, description = "Builds dependency graph for IBM i objects")
+  @Option(names = { "-h", "--help" }, usageHelp = true, description = "Migrates IBM i source physical files to IFS stream files")
   private boolean helpRequested = false;
 
   /*
@@ -160,32 +161,20 @@ public class SourceMigrator implements Runnable{
   }
 
   /* Main entry point of the migration process. */
-  public void migrate(String querySourcePFs, String ifsOutputDir, String libraryParam) {
-    try {
-      //TODO: Maybe this migrateSourcePFs() is not neccesary and i can do it directly here using migrate()
-      migrateSourcePFs(querySourcePFs, ifsOutputDir + "/" + libraryParam, libraryParam);
-
-
-    } catch (Exception e) {
-      e.printStackTrace();
-    } finally {
-      cleanup();
-    }
-  }
-
-  private void migrateSourcePFs(String querySourcePFs, String baseOutputDir, String library) throws SQLException, IOException,
+  public void migrate(String querySourcePFs, String ifsOutputDir, String libraryParam) throws SQLException, IOException,
       AS400SecurityException, ErrorCompletingRequestException, InterruptedException, PropertyVetoException {
     try (Statement stmt = connection.createStatement();
         ResultSet sourcePFs = stmt.executeQuery(querySourcePFs)) {
 
       while (sourcePFs.next()) {
         String sourcePf = sourcePFs.getString("SourcePf").trim();
-        System.out.println("\n\nMigrating Source PF: " + sourcePf + " in library: " + library);
+        System.out.println("\n\nMigrating Source PF: " + sourcePf + " in library: " + libraryParam);
 
-        String pfOutputDir = baseOutputDir + '/' + sourcePf;
+        // TODO: Should i create this when validating the source pf like i did with the libs?
+        String pfOutputDir = ifsOutputDir + '/' + sourcePf;
         utilities.createDirectory(pfOutputDir);
 
-        migrateMembers(library, sourcePf, pfOutputDir);
+        migrateMembers(libraryParam, sourcePf, pfOutputDir);
 
         totalSourcePFsMigrated++;
       }
@@ -221,6 +210,7 @@ public class SourceMigrator implements Runnable{
       String sourceType, String ifsOutputDir) {
     return CompletableFuture.runAsync(() -> {
       try {
+        //TODO: Should i use cmdStmt.execute isntead of this?
         String commandStr = "CPYTOSTMF FROMMBR('/QSYS.lib/" + library + ".lib/" + sourcePf + ".file/" + memberName
             + ".mbr') " +
             "TOSTMF('" + ifsOutputDir + "/" + memberName + "." + sourceType + "') " +
