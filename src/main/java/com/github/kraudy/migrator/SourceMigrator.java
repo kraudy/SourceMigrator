@@ -140,7 +140,7 @@ public class SourceMigrator implements Runnable{
       long startTime = System.nanoTime();
       // for () {}
       //TODO: This would go inside the same for loop as migrate()
-      String querySourcePFs = getSourcePFsQuery(libraryList.get(0), libraryList.get(0));
+      String querySourcePFs = utilities.getMigrationQuery(sourcePf, libraryList.get(0));
 
       // TODO: This could be colled once for every library in the list
       migrate(querySourcePFs, outDir + "/" + libraryList.get(0), libraryList.get(0));
@@ -171,14 +171,6 @@ public class SourceMigrator implements Runnable{
     } finally {
       cleanup();
     }
-  }
-
-  private String getSourcePFsQuery(String libraryParam, String library)
-      throws IOException, SQLException {
-    if (sourcePf == null) return utilities.getSourcePFs("", library); // Get all source pf in library
-    
-    return utilities.getSourcePFs(sourcePf, library); // Get specific source pf in library
-
   }
 
   private void migrateSourcePFs(String querySourcePFs, String baseOutputDir, String library) throws SQLException, IOException,

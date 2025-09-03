@@ -81,7 +81,7 @@ public class Utilities {
   }
 
   //TODO: Overload this thing
-  public String getSourcePFs(String sourcePf, String library) throws SQLException {
+  public String getMigrationQuery(String sourcePf, String library) throws SQLException {
     //TODO: Validate using SYSTABLES 
     // Get specific or all Source PF
     return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourcePf " +
