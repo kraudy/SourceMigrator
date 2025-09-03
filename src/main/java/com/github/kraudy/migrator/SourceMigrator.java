@@ -17,7 +17,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Scanner;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -46,9 +45,6 @@ public class SourceMigrator implements Runnable{
   private int totalSourcePFsMigrated = 0;
   private int totalMembersMigrated = 0;
   private int migrationErrors = 0;
-  private Scanner scanner; // TODO: Remove from here?
-  private boolean interactive; //TODO: Is removing final a good idea? I would preffer it to be created in the constructor
-  private CliHandler cliHandler;
   private Utilities utilities;
 
   static class outDirConverter implements CommandLine.ITypeConverter<String> {
@@ -89,9 +85,6 @@ public class SourceMigrator implements Runnable{
   @Option(names = "--pf", description = "Source Phisical File")
   private String sourcePf = null;
 
-  @Parameters(arity = "0..*", description = "<output_dir> <library> [source_pf]", paramLabel = "<args>")
-  private List<String> parameters;
-
   @Option(names = "-x", description = "Debug")
   private boolean debug = false;
 
@@ -117,6 +110,8 @@ public class SourceMigrator implements Runnable{
   public SourceMigrator(AS400 system, Connection connection) throws Exception {
     this.system = system;
 
+    this.utilities = new Utilities(connection, verbose);
+
     // Database
     this.connection = connection;
     this.connection.setAutoCommit(true);
@@ -128,19 +123,10 @@ public class SourceMigrator implements Runnable{
 
   public SourceMigrator(AS400 system, boolean interactive) throws Exception {
     this(system);
-    initInteractive(interactive);
   }
 
   public SourceMigrator(AS400 system, Connection connection, boolean interactive) throws Exception {
     this(system, connection);
-    initInteractive(interactive);
-  }
-
-  private void initInteractive(boolean interactive) {
-    this.interactive = interactive;
-    this.utilities = new Utilities(connection, verbose);
-    this.scanner = interactive ? new Scanner(System.in) : null;
-    this.cliHandler = interactive ? new CliHandler(scanner, connection, currentUser, utilities) : null;
   }
 
   @Override
@@ -149,9 +135,6 @@ public class SourceMigrator implements Runnable{
       outDir = getOutputDirectory(outDir); // Validate source dir
       
       libraryList = getLibrary(libraryList.stream().distinct().collect(Collectors.toList()), outDir); // Validate library list
-
-      boolean calculatedInteractive = (parameters == null || parameters.size() <= 1);
-      initInteractive(calculatedInteractive);
 
       //TODO: I should validate if sourcePf exist for each library here before getting the query
       if (sourcePf != null) validateSourcePFs(sourcePf, libraryList.get(0));
@@ -166,7 +149,7 @@ public class SourceMigrator implements Runnable{
       String querySourcePFs = getSourcePFsQuery(libraryList.get(0), libraryList.get(0));
 
       // TODO: This could be colled once for every library in the list
-      migrate(querySourcePFs, outDir + "/" + libraryList.get(0), libraryList.get(0), sourcePf);
+      migrate(querySourcePFs, outDir + "/" + libraryList.get(0), libraryList.get(0));
 
     } catch (Exception e) {
       e.printStackTrace();
@@ -176,14 +159,14 @@ public class SourceMigrator implements Runnable{
   }
 
   /* Main entry point of the migration process. */
-  public void migrate(String querySourcePFs, String ifsOutputDir, String libraryParam, String sourcePfParam) {
+  public void migrate(String querySourcePFs, String ifsOutputDir, String libraryParam) {
     try {
 
       //TODO: Move this out to run()
       long startTime = System.nanoTime();
 
       //TODO: Maybe this migrateSourcePFs() is not neccesary and i can do it directly here using migrate()
-      migrateSourcePFs(querySourcePFs, ifsOutputDir, libraryParam);
+      migrateSourcePFs(querySourcePFs, ifsOutputDir + "/" + libraryParam, libraryParam);
 
       //TODO: Move this out to run()
       System.out.println("\nMigration completed.");
@@ -237,7 +220,7 @@ public class SourceMigrator implements Runnable{
         if (verbose) {
           System.err.println(" *Source PF " + sourcePf + " does not exist in library " + library);
           //Show available source PF in library
-          cliHandler.showSourcePFs(library);
+          utilities.showSourcePFs(library);
         }
         throw new IllegalArgumentException("Source PF " + sourcePf + " does not exist in library " + library);
       }
@@ -333,10 +316,6 @@ public class SourceMigrator implements Runnable{
       }
       if (system != null) {
         system.disconnectAllServices();
-      }
-
-      if (scanner != null) {
-        scanner.close();
       }
 
     } catch (SQLException e) {

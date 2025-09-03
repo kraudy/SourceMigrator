@@ -60,6 +60,30 @@ public class Utilities {
         "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
   }
 
+  public void showSourcePFs(String library) throws SQLException {
+    int total = 0;
+    try (Statement stmt = connection.createStatement();
+        ResultSet rs = stmt.executeQuery(
+            "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourcePf, " +
+                "COUNT(*) AS Members " +
+                "FROM QSYS2. SYSPARTITIONSTAT " +
+                "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
+                "AND TRIM(SOURCE_TYPE) <> '' " +
+                "GROUP BY SYSTEM_TABLE_NAME")) {
+      System.out.println("\nList of available Source PFs in library: " + library);
+      System.out.println("    SourcePf      | Number of Members");
+      System.out.println("    ------------- | -----------------");
+
+      while (rs.next()) {
+        String sourcePf = rs.getString("SourcePf").trim();
+        String membersCount = rs.getString("Members").trim();
+        total += Integer.parseInt(membersCount);
+        System.out.printf("    %-13s | %17s%n", sourcePf, membersCount);
+      }
+      System.out.println(String.format("   Total: %27s%n", total));
+    }
+  }
+  
   // TODO: Add params validation to this class
   public void validateLibrary(String library) throws SQLException {
     try (Statement validateStmt = connection.createStatement();
