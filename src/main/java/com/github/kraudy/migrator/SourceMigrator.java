@@ -83,7 +83,7 @@ public class SourceMigrator implements Runnable{
   private String outDir = "sources";
 
   @Option(names = "--pf", description = "Source Phisical File")
-  private String sourcePf = null;
+  private String sourcePf = "";
 
   @Option(names = "-x", description = "Debug")
   private boolean debug = false;
@@ -110,8 +110,6 @@ public class SourceMigrator implements Runnable{
   public SourceMigrator(AS400 system, Connection connection) throws Exception {
     this.system = system;
 
-    this.utilities = new Utilities(connection, verbose);
-
     // Database
     this.connection = connection;
     this.connection.setAutoCommit(true);
@@ -121,35 +119,38 @@ public class SourceMigrator implements Runnable{
     this.currentUser.loadUserInformation();
   }
 
-  public SourceMigrator(AS400 system, boolean interactive) throws Exception {
-    this(system);
-  }
-
-  public SourceMigrator(AS400 system, Connection connection, boolean interactive) throws Exception {
-    this(system, connection);
-  }
-
   @Override
   public void run() {
     try {
-      outDir = getOutputDirectory(outDir); // Validate source dir
+      // Utilities
+      this.utilities = new Utilities(connection, currentUser, verbose);
+
+      outDir = utilities.getOutputDirectory(outDir); // Validate source dir
       
-      libraryList = getLibrary(libraryList.stream().distinct().collect(Collectors.toList()), outDir); // Validate library list
+      libraryList = utilities.getLibrary(libraryList.stream().distinct().collect(Collectors.toList()), outDir); // Validate library list
 
       //TODO: I should validate if sourcePf exist for each library here before getting the query
-      if (sourcePf != null) validateSourcePFs(sourcePf, libraryList.get(0));
+      utilities.validateSourcePFs(sourcePf, libraryList.get(0));
 
       //TODO: Add verbose validation
       System.out.println("User: " + system.getUserId().trim().toUpperCase());
       System.out.println("System: " + utilities.getSystemName());
       System.out.println("System's CCSID: " + utilities.getCcsid());
 
+      long startTime = System.nanoTime();
       // for () {}
       //TODO: This would go inside the same for loop as migrate()
       String querySourcePFs = getSourcePFsQuery(libraryList.get(0), libraryList.get(0));
 
       // TODO: This could be colled once for every library in the list
       migrate(querySourcePFs, outDir + "/" + libraryList.get(0), libraryList.get(0));
+
+      System.out.println("\nMigration completed.");
+      System.out.println("Total Source PFs migrated: " + totalSourcePFsMigrated);
+      System.out.println("Total members migrated: " + totalMembersMigrated);
+      System.out.println("Migration errors: " + migrationErrors);
+      long durationNanos = System.nanoTime() - startTime;
+      System.out.printf("Total time taken: %.2f seconds%n", TimeUnit.NANOSECONDS.toMillis(durationNanos) / 1000.0);
 
     } catch (Exception e) {
       e.printStackTrace();
@@ -161,69 +162,14 @@ public class SourceMigrator implements Runnable{
   /* Main entry point of the migration process. */
   public void migrate(String querySourcePFs, String ifsOutputDir, String libraryParam) {
     try {
-
-      //TODO: Move this out to run()
-      long startTime = System.nanoTime();
-
       //TODO: Maybe this migrateSourcePFs() is not neccesary and i can do it directly here using migrate()
       migrateSourcePFs(querySourcePFs, ifsOutputDir + "/" + libraryParam, libraryParam);
 
-      //TODO: Move this out to run()
-      System.out.println("\nMigration completed.");
-      System.out.println("Total Source PFs migrated: " + totalSourcePFsMigrated);
-      System.out.println("Total members migrated: " + totalMembersMigrated);
-      System.out.println("Migration errors: " + migrationErrors);
-      long durationNanos = System.nanoTime() - startTime;
-      System.out.printf("Total time taken: %.2f seconds%n", TimeUnit.NANOSECONDS.toMillis(durationNanos) / 1000.0);
+
     } catch (Exception e) {
       e.printStackTrace();
     } finally {
       cleanup();
-    }
-  }
-
-  //TODO: Move to utils
-  private String getOutputDirectory(String outDir) throws IOException {
-    if (outDir.startsWith("/")) {
-      return outDir; // Full path
-    }
-
-    String homeDir = currentUser.getHomeDirectory(); // Needed for relative path
-    if (homeDir == null || homeDir.isEmpty()) {
-      homeDir = "/tmp"; // Fallback
-      if (verbose) System.err.println(" *The current user has no home directory. Default to '/tmp'");
-      //TODO: Add param for this, like something to make it crash, maybe -x? or some default params
-      //throw new IllegalArgumentException("The current user has no home directory.");
-    }
-
-    return homeDir + "/" + outDir; // Relative path
-  }
-
-  //TODO: This could be done only using validateLibrary
-  private List<String> getLibrary(List<String> libraryList, String outDir) throws IOException, SQLException {
-    for(String library: libraryList){
-      utilities.validateLibrary(library); // Validate if library exist
-      utilities.createDirectory(outDir + "/" + library); // Create dir for library
-    }
-    return libraryList;
-  }
-
-  private void validateSourcePFs(String sourcePf, String library) throws SQLException{
-    // Validate if Source PF exists
-    try (Statement validateStmt = connection.createStatement();
-        ResultSet validateRs = validateStmt.executeQuery(
-            "SELECT 1 AS Exist FROM QSYS2. SYSPARTITIONSTAT " +
-                "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
-                "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
-                "AND TRIM(SOURCE_TYPE) <> '' LIMIT 1")) {
-      if (!validateRs.next()) {
-        if (verbose) {
-          System.err.println(" *Source PF " + sourcePf + " does not exist in library " + library);
-          //Show available source PF in library
-          utilities.showSourcePFs(library);
-        }
-        throw new IllegalArgumentException("Source PF " + sourcePf + " does not exist in library " + library);
-      }
     }
   }
 

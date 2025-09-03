@@ -4,26 +4,22 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
+
+import com.ibm.as400.access.User;
+
 import java.io.File;
+import java.io.IOException;
 
 public class Utilities {
   private final Connection connection;
   private final boolean verbose;
+  private final User currentUser;
 
-  public Utilities(Connection connection, boolean verbose) {
+  public Utilities(Connection connection, User currentUser, boolean verbose) {
     this.connection = connection;
+    this.currentUser = currentUser;
     this.verbose = verbose;
-  }
-
-  public void createDirectory(String dirPath) {
-    //TODO: Change to jt400 IFSFile
-    File outputDir = new File(dirPath);
-    if (outputDir.exists()) {
-      if (verbose) System.err.println(" *Dir already exists: " + dirPath + " ...");
-      return;
-    }
-    if (verbose) System.out.println("Creating dir: " + dirPath + " ...");
-    outputDir.mkdirs();
   }
 
   public String getSystemName() throws SQLException {
@@ -46,6 +42,42 @@ public class Utilities {
       }
     }
     return "";
+  }
+
+  public String getOutputDirectory(String outDir) throws IOException {
+    if (outDir.startsWith("/")) {
+      return outDir; // Full path
+    }
+
+    String homeDir = currentUser.getHomeDirectory(); // Needed for relative path
+    if (homeDir == null || homeDir.isEmpty()) {
+      homeDir = "/tmp"; // Fallback
+      if (verbose) System.err.println(" *The current user has no home directory. Default to '/tmp'");
+      //TODO: Add param for this, like something to make it crash, maybe -x? or some default params
+      //throw new IllegalArgumentException("The current user has no home directory.");
+    }
+
+    return homeDir + "/" + outDir; // Relative path
+  }
+
+  //TODO: This could be done only using validateLibrary
+  public List<String> getLibrary(List<String> libraryList, String outDir) throws IOException, SQLException {
+    for(String library: libraryList){
+      validateLibrary(library); // Validate if library exist
+      createDirectory(outDir + "/" + library); // Create dir for library
+    }
+    return libraryList;
+  }
+
+  public void createDirectory(String dirPath) {
+    //TODO: Change to jt400 IFSFile
+    File outputDir = new File(dirPath);
+    if (outputDir.exists()) {
+      if (verbose) System.err.println(" *Dir already exists: " + dirPath + " ...");
+      return;
+    }
+    if (verbose) System.out.println("Creating dir: " + dirPath + " ...");
+    outputDir.mkdirs();
   }
 
   //TODO: Overload this thing
@@ -81,6 +113,25 @@ public class Utilities {
         System.out.printf("    %-13s | %17s%n", sourcePf, membersCount);
       }
       System.out.println(String.format("   Total: %27s%n", total));
+    }
+  }
+
+  public void validateSourcePFs(String sourcePf, String library) throws SQLException{
+    // Validate if Source PF exists
+    try (Statement validateStmt = connection.createStatement();
+        ResultSet validateRs = validateStmt.executeQuery(
+            "SELECT 1 AS Exist FROM QSYS2. SYSPARTITIONSTAT " +
+                "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
+                "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
+                "AND TRIM(SOURCE_TYPE) <> '' LIMIT 1")) {
+      if (!validateRs.next()) {
+        if (verbose) {
+          System.err.println(" *Source PF " + sourcePf + " does not exist in library " + library);
+          //Show available source PF in library
+          showSourcePFs(library);
+        }
+        throw new IllegalArgumentException("Source PF " + sourcePf + " does not exist in library " + library);
+      }
     }
   }
   
