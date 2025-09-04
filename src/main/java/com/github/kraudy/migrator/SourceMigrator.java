@@ -64,13 +64,13 @@ public class SourceMigrator implements Runnable{
       try {
         return library.trim().toUpperCase();
       } catch (IllegalArgumentException e) {
-        throw new CommandLine.TypeConversionException("Invalid libraries: '" + library);
+        throw new CommandLine.TypeConversionException("Invalid library name: '" + library);
       }
     }
   }
 
-  @Option(names = { "-l", "--libs" }, required = true, arity = "1..*", description = "Library list to scan", converter = libraryConverter.class)
-  private List<String> libraryList = new ArrayList<>();
+  @Option(names = { "-l", "--lib" }, required = true, description = "Library to scan", converter = libraryConverter.class)
+  private String library;
 
   /* 
   @Option(names = {"-a", "--all"}, description = "Migrate all sources")
@@ -85,6 +85,9 @@ public class SourceMigrator implements Runnable{
   //TODO: I'm still not sure how this should relate to the library list
   @Option(names = "--pf", description = "Source Phisical File")
   private String sourcePf = "";
+
+  @Option(names = "--mbrs", arity = "0..*", description = "Specific source members to migrate")
+  private List<String> members = new ArrayList<>();
 
   @Option(names = "-x", description = "Debug")
   private boolean debug = false;
@@ -128,10 +131,12 @@ public class SourceMigrator implements Runnable{
 
       outDir = utilities.getOutputDirectory(outDir); // Validate source dir
       
-      libraryList = utilities.getLibrary(libraryList.stream().distinct().collect(Collectors.toList()), outDir); // Validate library list
+      utilities.validateLibrary(library);
+      utilities.createDirectory(outDir + "/" + library);
+      //libraryList.stream().distinct().collect(Collectors.toList())
 
       //TODO: I should validate if sourcePf exist for each library here before getting the query
-      utilities.validateSourcePFs(sourcePf, libraryList.get(0));
+      utilities.validateSourcePFs(sourcePf, library);
 
       //TODO: Add verbose validation
       System.out.println("User: " + system.getUserId().trim().toUpperCase());
@@ -141,10 +146,10 @@ public class SourceMigrator implements Runnable{
       long startTime = System.nanoTime();
       // for () {}
       //TODO: This would go inside the same for loop as migrate()
-      String querySourcePFs = utilities.getMigrationQuery(sourcePf, libraryList.get(0));
+      String querySourcePFs = utilities.getMigrationQuery(sourcePf, library);
 
       // TODO: This could be colled once for every library in the list
-      migrate(querySourcePFs, outDir + "/" + libraryList.get(0), libraryList.get(0));
+      migrate(querySourcePFs, outDir + "/" + library, library);
 
       System.out.println("\nMigration completed.");
       System.out.println("Total Source PFs migrated: " + totalSourcePFsMigrated);
@@ -210,7 +215,7 @@ public class SourceMigrator implements Runnable{
       String sourceType, String ifsOutputDir) {
     return CompletableFuture.runAsync(() -> {
       try {
-        //TODO: Should i use cmdStmt.execute isntead of this?
+        //TODO: Should i use cmdStmt.execute instead of this?
         String commandStr = "CPYTOSTMF FROMMBR('/QSYS.lib/" + library + ".lib/" + sourcePf + ".file/" + memberName
             + ".mbr') " +
             "TOSTMF('" + ifsOutputDir + "/" + memberName + "." + sourceType + "') " +

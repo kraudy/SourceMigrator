@@ -60,15 +60,6 @@ public class Utilities {
     return homeDir + "/" + outDir; // Relative path
   }
 
-  //TODO: This could be done only using validateLibrary
-  public List<String> getLibrary(List<String> libraryList, String outDir) throws IOException, SQLException {
-    for(String library: libraryList){
-      validateLibrary(library); // Validate if library exist
-      createDirectory(outDir + "/" + library); // Create dir for library
-    }
-    return libraryList;
-  }
-
   public void createDirectory(String dirPath) {
     //TODO: Change to jt400 IFSFile
     File outputDir = new File(dirPath);
