@@ -4,7 +4,10 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.ibm.as400.access.User;
 
@@ -71,7 +74,6 @@ public class Utilities {
     outputDir.mkdirs();
   }
 
-  //TODO: Overload this thing
   public String getMigrationQuery(String sourcePf, String library) throws SQLException {
     //TODO: Validate using SYSTABLES 
     // Get specific or all Source PF
@@ -81,6 +83,15 @@ public class Utilities {
         (sourcePf.isEmpty() ? "" : "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' ") +
         "AND TRIM(SOURCE_TYPE) <> '' " +
         "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
+  }
+
+  public String getMigrationQuery(String sourcePf, String library, List<String> members) throws SQLException {
+    // TODO: Add this directly in the migration query to not include cli parmas in the migration process
+    //if (!members.isEmpty()) {
+    //  String inClause = members.stream().map(m -> "'" + m.trim().toUpperCase() + "'").collect(Collectors.joining(", "));
+    //  baseQuery += " AND SYSTEM_TABLE_MEMBER IN (" + inClause + ")";
+    //}
+    return "";
   }
 
   public void showSourcePFs(String library) throws SQLException {
@@ -108,8 +119,7 @@ public class Utilities {
   }
 
   public void validateSourcePFs(String sourcePf, String library) throws SQLException{
-    //TODO: Fix this
-    if (sourcePf.equals("")) return;
+    if (sourcePf.equals("")) throw new IllegalArgumentException("Source PF is empty");
 
     // Validate if Source PF exists
     try (Statement validateStmt = connection.createStatement();
@@ -121,11 +131,35 @@ public class Utilities {
       if (!validateRs.next()) {
         if (verbose) {
           System.err.println(" *Source PF " + sourcePf + " does not exist in library " + library);
-          //Show available source PF in library
-          showSourcePFs(library);
+          showSourcePFs(library); //Show available source PF in library
         }
         throw new IllegalArgumentException("Source PF " + sourcePf + " does not exist in library " + library);
       }
+    }
+  }
+
+  public void validateMembers(String library, String sourcePf, List<String> members) throws SQLException {
+    if (members.isEmpty()) throw new IllegalArgumentException("Member's list is empty");
+
+    String inClause = members.stream().map(m -> "'" + m + "'").collect(Collectors.joining(", "));
+    try (Statement stmt = connection.createStatement();
+         ResultSet rs = stmt.executeQuery(
+             "SELECT CAST(SYSTEM_TABLE_MEMBER AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS Member " +
+             "FROM QSYS2.SYSPARTITIONSTAT " +
+             "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
+             "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
+             "AND SYSTEM_TABLE_MEMBER IN (" + inClause + ") " +
+             "AND TRIM(SOURCE_TYPE) <> '' ")) { //TODO: Add source type as param
+        Set<String> found = new HashSet<>();
+        while (rs.next()) {
+            found.add(rs.getString("Member").trim().toUpperCase());
+        }
+        List<String> missing = members.stream().map(m -> m.trim().toUpperCase()).filter(m -> !found.contains(m)).collect(Collectors.toList());
+        if (!missing.isEmpty()) {
+            if (verbose) System.err.println("Missing members in PF " + sourcePf + ": " + missing);
+            
+            throw new IllegalArgumentException("Some members do not exist in PF " + sourcePf + " in library " + library + ": " + missing);
+        }
     }
   }
   

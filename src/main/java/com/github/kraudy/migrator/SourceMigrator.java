@@ -69,6 +69,18 @@ public class SourceMigrator implements Runnable{
     }
   }
 
+  static class sourcePfConverter implements CommandLine.ITypeConverter<String> {
+    @Override
+    public String convert(String sourcePf) throws Exception {
+      try {
+        return sourcePf.trim().toUpperCase();
+      } catch (IllegalArgumentException e) {
+        throw new CommandLine.TypeConversionException("Invalid source PF: '" + sourcePf);
+      }
+    }
+  }
+  //TODO: Add member method for validation
+
   @Option(names = { "-l", "--lib" }, required = true, description = "Library to scan", converter = libraryConverter.class)
   private String library;
 
@@ -82,8 +94,7 @@ public class SourceMigrator implements Runnable{
   @Option(names = "-o", description = "Sources destination", converter = outDirConverter.class)
   private String outDir = "sources";
 
-  //TODO: I'm still not sure how this should relate to the library list
-  @Option(names = "--pf", description = "Source Phisical File")
+  @Option(names = "--pf", description = "Source Physical File", converter = sourcePfConverter.class)
   private String sourcePf = "";
 
   @Option(names = "--mbrs", arity = "0..*", description = "Specific source members to migrate")
@@ -133,10 +144,20 @@ public class SourceMigrator implements Runnable{
       
       utilities.validateLibrary(library);
       utilities.createDirectory(outDir + "/" + library);
-      //libraryList.stream().distinct().collect(Collectors.toList())
 
-      //TODO: I should validate if sourcePf exist for each library here before getting the query
-      utilities.validateSourcePFs(sourcePf, library);
+      if(!sourcePf.isEmpty()){
+        utilities.validateSourcePFs(sourcePf, library);
+      }
+
+      if (!members.isEmpty() && sourcePf.isEmpty()) {
+        throw new IllegalArgumentException("Members can only be specified when a specific source PF is provided.");
+      }
+
+      if (!members.isEmpty()) {
+        //TODO: do this on the input param: map(String::trim).map(String::toUpperCase)
+        members = members.stream().map(String::trim).map(String::toUpperCase).distinct().collect(Collectors.toList());
+        utilities.validateMembers(library, sourcePf, members);
+      }
 
       //TODO: Add verbose validation
       System.out.println("User: " + system.getUserId().trim().toUpperCase());
@@ -144,9 +165,8 @@ public class SourceMigrator implements Runnable{
       System.out.println("System's CCSID: " + utilities.getCcsid());
 
       long startTime = System.nanoTime();
-      // for () {}
-      //TODO: This would go inside the same for loop as migrate()
-      String querySourcePFs = utilities.getMigrationQuery(sourcePf, library);
+
+      String querySourcePFs = members.isEmpty()? utilities.getMigrationQuery(sourcePf, library): utilities.getMigrationQuery(sourcePf, library, members);
 
       // TODO: This could be colled once for every library in the list
       migrate(querySourcePFs, outDir + "/" + library, library);
