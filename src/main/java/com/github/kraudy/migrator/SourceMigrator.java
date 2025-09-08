@@ -47,7 +47,7 @@ public class SourceMigrator implements Runnable{
   private int migrationErrors = 0;
   private Utilities utilities;
 
-  static class outDirConverter implements CommandLine.ITypeConverter<String> {
+  static class OutDirConverter implements CommandLine.ITypeConverter<String> {
     @Override
     public String convert(String outDir) throws Exception {
       try {
@@ -58,7 +58,7 @@ public class SourceMigrator implements Runnable{
     }
   }
 
-  static class libraryConverter implements CommandLine.ITypeConverter<String> {
+  static class LibraryConverter implements CommandLine.ITypeConverter<String> {
     @Override
     public String convert(String library) throws Exception {
       try {
@@ -69,7 +69,7 @@ public class SourceMigrator implements Runnable{
     }
   }
 
-  static class sourcePfConverter implements CommandLine.ITypeConverter<String> {
+  static class SourcePfConverter implements CommandLine.ITypeConverter<String> {
     @Override
     public String convert(String sourcePf) throws Exception {
       try {
@@ -79,26 +79,37 @@ public class SourceMigrator implements Runnable{
       }
     }
   }
-  //TODO: Add member method for validation
 
-  @Option(names = { "-l", "--lib" }, required = true, description = "Library to scan", converter = libraryConverter.class)
+  static class SourceMemberConverter implements CommandLine.ITypeConverter<String> {
+    @Override
+    public String convert(String sourceMember) throws Exception {
+      try {
+        return sourceMember.trim().toUpperCase();
+      } catch (IllegalArgumentException e) {
+        throw new CommandLine.TypeConversionException("Invalid source member: '" + sourceMember);
+      }
+    }
+  }
+
+  @Option(names = { "-sl", "--source-lib" }, required = true, description = "Source library", converter = LibraryConverter.class)
   private String library;
 
-  /* 
-  @Option(names = {"-a", "--all"}, description = "Migrate all sources")
-  private boolean all = false;
-
-  @Option(names = {"-u", "--update"}, description = "Migrate only sources with change")
-  private boolean update = false;
-  */
-  @Option(names = "-o", description = "Sources destination", converter = outDirConverter.class)
-  private String outDir = "sources";
-
-  @Option(names = "--pf", description = "Source Physical File", converter = sourcePfConverter.class)
+  @Option(names = "--spf", description = "Source Physical File", converter = SourcePfConverter.class)
   private String sourcePf = "";
 
-  @Option(names = "--mbrs", arity = "0..*", description = "Specific source members to migrate")
+  @Option(names = "--mbrs", arity = "0..*", description = "Specific source members to migrate", converter = SourceMemberConverter.class)
   private List<String> members = new ArrayList<>();
+
+  /* 
+  @Option(names = {"-ut", "--updated-time"}, description = "Migrate only sources with change after timestamp")
+  private Timestamp updateTime;
+
+  @Option(names = {"-ct", "--creation-time"}, description = "Migrate only sources created after timestamp")
+  private Timestamp updateTime;
+  */
+   
+  @Option(names = "-o", description = "Sources destination", converter = OutDirConverter.class)
+  private String outDir = "sources";
 
   @Option(names = "-x", description = "Debug")
   private boolean debug = false;
@@ -154,7 +165,6 @@ public class SourceMigrator implements Runnable{
       }
 
       if (!members.isEmpty()) {
-        //TODO: do this on the input param: map(String::trim).map(String::toUpperCase)
         members = members.stream().map(String::trim).map(String::toUpperCase).distinct().collect(Collectors.toList());
         utilities.validateMembers(library, sourcePf, members);
       }
@@ -166,7 +176,10 @@ public class SourceMigrator implements Runnable{
 
       long startTime = System.nanoTime();
 
-      String querySourcePFs = members.isEmpty()? utilities.getMigrationQuery(sourcePf, library): utilities.getMigrationQuery(sourcePf, library, members);
+      String querySourcePFs = null;
+      if (sourcePf.isEmpty()) querySourcePFs = utilities.getMigrationQuery(library); // Get all source pf 
+      if (!sourcePf.isEmpty() && members.isEmpty()) querySourcePFs = utilities.getMigrationQuery(library, sourcePf); // Get specific source pf
+      if (!sourcePf.isEmpty() && !members.isEmpty()) querySourcePFs = utilities.getMigrationQuery(library, sourcePf, members); // Get specific source members
 
       // TODO: This could be colled once for every library in the list
       migrate(querySourcePFs, outDir + "/" + library, library);
@@ -186,20 +199,20 @@ public class SourceMigrator implements Runnable{
   }
 
   /* Main entry point of the migration process. */
-  public void migrate(String querySourcePFs, String ifsOutputDir, String libraryParam) throws SQLException, IOException,
+  public void migrate(String querySourcePFs, String ifsOutputDir, String library) throws SQLException, IOException,
       AS400SecurityException, ErrorCompletingRequestException, InterruptedException, PropertyVetoException {
     try (Statement stmt = connection.createStatement();
         ResultSet sourcePFs = stmt.executeQuery(querySourcePFs)) {
 
       while (sourcePFs.next()) {
         String sourcePf = sourcePFs.getString("SourcePf").trim();
-        System.out.println("\n\nMigrating Source PF: " + sourcePf + " in library: " + libraryParam);
+        System.out.println("\n\nMigrating Source PF: " + sourcePf + " in library: " + library);
 
         // TODO: Should i create this when validating the source pf like i did with the libs?
         String pfOutputDir = ifsOutputDir + '/' + sourcePf;
         utilities.createDirectory(pfOutputDir);
 
-        migrateMembers(libraryParam, sourcePf, pfOutputDir);
+        migrateMembers(library, sourcePf, pfOutputDir);
 
         totalSourcePFsMigrated++;
       }

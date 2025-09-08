@@ -74,24 +74,37 @@ public class Utilities {
     outputDir.mkdirs();
   }
 
-  public String getMigrationQuery(String sourcePf, String library) throws SQLException {
+  //TODO: Add timestamp validation for these three.
+  public String getMigrationQuery(String library) throws SQLException {
     //TODO: Validate using SYSTABLES 
-    // Get specific or all Source PF
+    // Get all Source PF
     return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourcePf " +
         "FROM QSYS2. SYSPARTITIONSTAT " +
         "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
-        (sourcePf.isEmpty() ? "" : "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' ") +
         "AND TRIM(SOURCE_TYPE) <> '' " +
         "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
   }
 
-  public String getMigrationQuery(String sourcePf, String library, List<String> members) throws SQLException {
-    // TODO: Add this directly in the migration query to not include cli parmas in the migration process
-    //if (!members.isEmpty()) {
-    //  String inClause = members.stream().map(m -> "'" + m.trim().toUpperCase() + "'").collect(Collectors.joining(", "));
-    //  baseQuery += " AND SYSTEM_TABLE_MEMBER IN (" + inClause + ")";
-    //}
-    return "";
+  public String getMigrationQuery(String library, String sourcePf) throws SQLException {
+    // Get specific Source PF
+    return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourcePf " +
+        "FROM QSYS2. SYSPARTITIONSTAT " +
+        "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
+        "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
+        "AND TRIM(SOURCE_TYPE) <> '' " +
+        "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
+  }
+
+  public String getMigrationQuery(String library, String sourcePf, List<String> members) throws SQLException {
+    // Get specific Source members
+    String inClause = members.stream().map(m -> "'" + m + "'").collect(Collectors.joining(", "));
+    return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourcePf " +
+        "FROM QSYS2. SYSPARTITIONSTAT " +
+        "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
+        "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
+        "AND TRIM(SOURCE_TYPE) <> '' " +
+        "AND SYSTEM_TABLE_MEMBER IN (" + inClause + ") " +
+        "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
   }
 
   public void showSourcePFs(String library) throws SQLException {
