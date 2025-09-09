@@ -74,37 +74,84 @@ public class Utilities {
     outputDir.mkdirs();
   }
 
+  public void createDirectory(String dirPath, String library) throws SQLException {
+    try (Statement stmt = connection.createStatement();
+        ResultSet sourcePFs = stmt.executeQuery(
+          "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourcePf " +
+          "FROM QSYS2. SYSPARTITIONSTAT " +
+          "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
+          "AND TRIM(SOURCE_TYPE) <> '' " +
+          "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA"
+        )) {
+      while (sourcePFs.next()) {
+        String sourcePf = sourcePFs.getString("SourcePf").trim();
+
+        createDirectory(dirPath, library, sourcePf);
+
+      }
+    }
+    
+  }
+
+  public void createDirectory(String dirPath, String library, String sourcePf) {
+    createDirectory(dirPath + "/" + library + "/" + sourcePf);
+  }
+
   //TODO: Add timestamp validation for these three.
   public String getMigrationQuery(String library) throws SQLException {
     //TODO: Validate using SYSTABLES 
     // Get all Source PF
-    return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourcePf " +
+    return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourcePf, " +
+                  "CAST(SYSTEM_TABLE_MEMBER AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS Member, " + 
+                  "CAST(SOURCE_TYPE AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourceType " +
         "FROM QSYS2. SYSPARTITIONSTAT " +
         "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
-        "AND TRIM(SOURCE_TYPE) <> '' " +
-        "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
+        "AND TRIM(SOURCE_TYPE) <> '' ";
   }
 
   public String getMigrationQuery(String library, String sourcePf) throws SQLException {
     // Get specific Source PF
-    return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourcePf " +
+    return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourcePf, " +
+                  "CAST(SYSTEM_TABLE_MEMBER AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS Member, " + 
+                  "CAST(SOURCE_TYPE AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourceType " +
         "FROM QSYS2. SYSPARTITIONSTAT " +
         "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
         "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
-        "AND TRIM(SOURCE_TYPE) <> '' " +
-        "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
+        "AND TRIM(SOURCE_TYPE) <> '' ";
   }
 
   public String getMigrationQuery(String library, String sourcePf, List<String> members) throws SQLException {
     // Get specific Source members
     String inClause = members.stream().map(m -> "'" + m + "'").collect(Collectors.joining(", "));
-    return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourcePf " +
+    return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourcePf, " +
+                  "CAST(SYSTEM_TABLE_MEMBER AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS Member, " + 
+                  "CAST(SOURCE_TYPE AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourceType " +
         "FROM QSYS2. SYSPARTITIONSTAT " +
         "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
         "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
         "AND TRIM(SOURCE_TYPE) <> '' " +
-        "AND SYSTEM_TABLE_MEMBER IN (" + inClause + ") " +
-        "GROUP BY SYSTEM_TABLE_NAME, SYSTEM_TABLE_SCHEMA";
+        "AND SYSTEM_TABLE_MEMBER IN (" + inClause + ") ";
+  }
+
+  public void validateSourcePFs(String sourcePf, String library) throws SQLException{
+    if (sourcePf.equals("")) throw new IllegalArgumentException("Source PF is empty");
+
+    // Validate if Source PF exists
+    try (Statement validateStmt = connection.createStatement();
+        ResultSet validateRs = validateStmt.executeQuery(
+            "SELECT 1 AS Exist FROM QSYS2. SYSPARTITIONSTAT " +
+                "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
+                "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
+                "AND TRIM(SOURCE_TYPE) <> '' LIMIT 1")) {
+      if (!validateRs.next()) {
+        if (verbose) {
+          System.err.println(" *Source PF " + sourcePf + " does not exist in library " + library);
+          showSourcePFs(library); //Show available source PF in library
+        }
+        throw new IllegalArgumentException("Source PF " + sourcePf + " does not exist in library " + library);
+      }
+
+    }
   }
 
   public void showSourcePFs(String library) throws SQLException {
@@ -131,26 +178,6 @@ public class Utilities {
     }
   }
 
-  public void validateSourcePFs(String sourcePf, String library) throws SQLException{
-    if (sourcePf.equals("")) throw new IllegalArgumentException("Source PF is empty");
-
-    // Validate if Source PF exists
-    try (Statement validateStmt = connection.createStatement();
-        ResultSet validateRs = validateStmt.executeQuery(
-            "SELECT 1 AS Exist FROM QSYS2. SYSPARTITIONSTAT " +
-                "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
-                "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
-                "AND TRIM(SOURCE_TYPE) <> '' LIMIT 1")) {
-      if (!validateRs.next()) {
-        if (verbose) {
-          System.err.println(" *Source PF " + sourcePf + " does not exist in library " + library);
-          showSourcePFs(library); //Show available source PF in library
-        }
-        throw new IllegalArgumentException("Source PF " + sourcePf + " does not exist in library " + library);
-      }
-    }
-  }
-
   public void validateMembers(String library, String sourcePf, List<String> members) throws SQLException {
     if (members.isEmpty()) throw new IllegalArgumentException("Member's list is empty");
 
@@ -162,7 +189,7 @@ public class Utilities {
              "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
              "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
              "AND SYSTEM_TABLE_MEMBER IN (" + inClause + ") " +
-             "AND TRIM(SOURCE_TYPE) <> '' ")) { //TODO: Add source type as param
+             "AND TRIM(SOURCE_TYPE) <> '' ")) { //TODO: Add source type as param?
         Set<String> found = new HashSet<>();
         while (rs.next()) {
             found.add(rs.getString("Member").trim().toUpperCase());

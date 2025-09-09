@@ -156,17 +156,31 @@ public class SourceMigrator implements Runnable{
       utilities.validateLibrary(library);
       utilities.createDirectory(outDir + "/" + library);
 
-      if(!sourcePf.isEmpty()){
-        utilities.validateSourcePFs(sourcePf, library);
-      }
-
       if (!members.isEmpty() && sourcePf.isEmpty()) {
         throw new IllegalArgumentException("Members can only be specified when a specific source PF is provided.");
       }
+      
+      String querySources = null;
+      /* No sourcPf and no Members */
+      if(sourcePf.isEmpty() && members.isEmpty()){
+        utilities.createDirectory(outDir, library);
+        querySources = utilities.getMigrationQuery(library); // Get all source pf 
+      }
 
-      if (!members.isEmpty()) {
+      /* SourcPf and no Members */
+      if(!sourcePf.isEmpty() && members.isEmpty()){
+        utilities.validateSourcePFs(sourcePf, library);
+        utilities.createDirectory(outDir, library, sourcePf);
+        querySources = utilities.getMigrationQuery(library, sourcePf); // Get specific source pf
+      }
+
+      /* SourcPf and Members */
+      if (!sourcePf.isEmpty() && !members.isEmpty()) {
+        utilities.validateSourcePFs(sourcePf, library);
+        utilities.createDirectory(outDir, library, sourcePf);
         members = members.stream().map(String::trim).map(String::toUpperCase).distinct().collect(Collectors.toList());
         utilities.validateMembers(library, sourcePf, members);
+        querySources = utilities.getMigrationQuery(library, sourcePf, members); // Get specific source members
       }
 
       //TODO: Add verbose validation
@@ -176,13 +190,7 @@ public class SourceMigrator implements Runnable{
 
       long startTime = System.nanoTime();
 
-      String querySourcePFs = null;
-      if (sourcePf.isEmpty()) querySourcePFs = utilities.getMigrationQuery(library); // Get all source pf 
-      if (!sourcePf.isEmpty() && members.isEmpty()) querySourcePFs = utilities.getMigrationQuery(library, sourcePf); // Get specific source pf
-      if (!sourcePf.isEmpty() && !members.isEmpty()) querySourcePFs = utilities.getMigrationQuery(library, sourcePf, members); // Get specific source members
-
-      // TODO: This could be colled once for every library in the list
-      migrate(querySourcePFs, outDir + "/" + library, library);
+      migrate(querySources, outDir + "/" + library, library);
 
       System.out.println("\nMigration completed.");
       System.out.println("Total Source PFs migrated: " + totalSourcePFsMigrated);
@@ -199,44 +207,21 @@ public class SourceMigrator implements Runnable{
   }
 
   /* Main entry point of the migration process. */
-  public void migrate(String querySourcePFs, String ifsOutputDir, String library) throws SQLException, IOException,
+  public void migrate(String querySources, String ifsOutputDir, String library) throws SQLException, IOException,
       AS400SecurityException, ErrorCompletingRequestException, InterruptedException, PropertyVetoException {
     try (Statement stmt = connection.createStatement();
-        ResultSet sourcePFs = stmt.executeQuery(querySourcePFs)) {
-
-      while (sourcePFs.next()) {
-        String sourcePf = sourcePFs.getString("SourcePf").trim();
-        System.out.println("\n\nMigrating Source PF: " + sourcePf + " in library: " + library);
-
-        // TODO: Should i create this when validating the source pf like i did with the libs?
-        String pfOutputDir = ifsOutputDir + '/' + sourcePf;
-        utilities.createDirectory(pfOutputDir);
-
-        migrateMembers(library, sourcePf, pfOutputDir);
-
-        totalSourcePFsMigrated++;
-      }
-    }
-  }
-
-  private void migrateMembers(String library, String sourcePf, String ifsOutputDir) throws SQLException, IOException,
-      AS400SecurityException, ErrorCompletingRequestException, InterruptedException, PropertyVetoException {
-    try (Statement stmt = connection.createStatement();
-        ResultSet rsMembers = stmt.executeQuery(
-            "SELECT CAST(SYSTEM_TABLE_MEMBER AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS Member, " + 
-                    "CAST(SOURCE_TYPE AS VARCHAR(10) CCSID " + INVARIANT_CCSID + ") AS SourceType " +
-                "FROM QSYS2. SYSPARTITIONSTAT " +
-                "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
-                "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
-                "AND TRIM(SOURCE_TYPE) <> ''")) {
+        ResultSet rsQuerySources = stmt.executeQuery(querySources)) {
 
       List<CompletableFuture<Void>> futures = new ArrayList<>();
-      while (rsMembers.next()) {
-        String memberName = rsMembers.getString("Member").trim();
-        String sourceType = rsMembers.getString("SourceType").trim();
+      while (rsQuerySources.next()) {
+        String sourcePf = rsQuerySources.getString("SourcePf").trim();
+        String memberName = rsQuerySources.getString("Member").trim();
+        String sourceType = rsQuerySources.getString("SourceType").trim();
 
-        CompletableFuture<Void> future = migrateMemberAsync(library, sourcePf, memberName, sourceType, ifsOutputDir);
+        CompletableFuture<Void> future = migrateAsync(library, sourcePf, memberName, sourceType, ifsOutputDir + "/" + sourcePf);
         futures.add(future);
+
+        //totalSourcePFsMigrated++;
       }
 
       CompletableFuture<Void> allFutures = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
@@ -244,7 +229,7 @@ public class SourceMigrator implements Runnable{
     }
   }
 
-  private CompletableFuture<Void> migrateMemberAsync(String library, String sourcePf, String memberName,
+  private CompletableFuture<Void> migrateAsync(String library, String sourcePf, String memberName,
       String sourceType, String ifsOutputDir) {
     return CompletableFuture.runAsync(() -> {
       try {
@@ -259,7 +244,7 @@ public class SourceMigrator implements Runnable{
           System.out.println("Could not migrate " + memberName + ": Failed");
           migrationErrors++;
         } else {
-          System.out.println("Migrated " + memberName + ": OK");
+          System.out.println("Migrated SourcePf: " + sourcePf + " | member: " + memberName + "." + sourceType + ": OK");
           totalMembersMigrated++;
         }
 
@@ -273,7 +258,6 @@ public class SourceMigrator implements Runnable{
 
     });
   }
-
 
   private void cleanup() {
     try {
