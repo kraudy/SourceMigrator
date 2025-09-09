@@ -160,28 +160,26 @@ public class SourceMigrator implements Runnable{
         throw new IllegalArgumentException("Members can only be specified when a specific source PF is provided.");
       }
       
-      String querySources = null;
-      /* No sourcPf and no Members */
+      /* No specific sourcPf nor Members */
       if(sourcePf.isEmpty() && members.isEmpty()){
         utilities.createDirectory(outDir, library);
-        querySources = utilities.getMigrationQuery(library); // Get all source pf 
       }
 
-      /* SourcPf and no Members */
+      /* Specific SourcPf and no Members */
       if(!sourcePf.isEmpty() && members.isEmpty()){
         utilities.validateSourcePFs(sourcePf, library);
         utilities.createDirectory(outDir, library, sourcePf);
-        querySources = utilities.getMigrationQuery(library, sourcePf); // Get specific source pf
       }
 
-      /* SourcPf and Members */
+      /* Specific SourcPf and Members */
       if (!sourcePf.isEmpty() && !members.isEmpty()) {
         utilities.validateSourcePFs(sourcePf, library);
         utilities.createDirectory(outDir, library, sourcePf);
         members = members.stream().map(String::trim).map(String::toUpperCase).distinct().collect(Collectors.toList());
         utilities.validateMembers(library, sourcePf, members);
-        querySources = utilities.getMigrationQuery(library, sourcePf, members); // Get specific source members
       }
+
+      String querySources = utilities.getMigrationQuery(library, sourcePf, members);
 
       //TODO: Add verbose validation
       System.out.println("User: " + system.getUserId().trim().toUpperCase());
@@ -221,6 +219,7 @@ public class SourceMigrator implements Runnable{
         CompletableFuture<Void> future = migrateAsync(library, sourcePf, memberName, sourceType, ifsOutputDir + "/" + sourcePf);
         futures.add(future);
 
+        // TODO: Adjust this count
         //totalSourcePFsMigrated++;
       }
 

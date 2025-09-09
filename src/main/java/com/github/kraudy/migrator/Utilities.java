@@ -97,40 +97,16 @@ public class Utilities {
     createDirectory(dirPath + "/" + library + "/" + sourcePf);
   }
 
-  //TODO: Add timestamp validation for these three.
-  public String getMigrationQuery(String library) throws SQLException {
-    //TODO: Validate using SYSTABLES 
-    // Get all Source PF
-    return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourcePf, " +
-                  "CAST(SYSTEM_TABLE_MEMBER AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS Member, " + 
-                  "CAST(SOURCE_TYPE AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourceType " +
-        "FROM QSYS2. SYSPARTITIONSTAT " +
-        "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
-        "AND TRIM(SOURCE_TYPE) <> '' ";
-  }
-
-  public String getMigrationQuery(String library, String sourcePf) throws SQLException {
-    // Get specific Source PF
-    return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourcePf, " +
-                  "CAST(SYSTEM_TABLE_MEMBER AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS Member, " + 
-                  "CAST(SOURCE_TYPE AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourceType " +
-        "FROM QSYS2. SYSPARTITIONSTAT " +
-        "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
-        "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
-        "AND TRIM(SOURCE_TYPE) <> '' ";
-  }
-
+  //TODO: Add timestamp validation.
   public String getMigrationQuery(String library, String sourcePf, List<String> members) throws SQLException {
-    // Get specific Source members
-    String inClause = members.stream().map(m -> "'" + m + "'").collect(Collectors.joining(", "));
     return "SELECT CAST(SYSTEM_TABLE_NAME AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourcePf, " +
                   "CAST(SYSTEM_TABLE_MEMBER AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS Member, " + 
                   "CAST(SOURCE_TYPE AS VARCHAR(10) CCSID " + SourceMigrator.INVARIANT_CCSID + ") AS SourceType " +
         "FROM QSYS2. SYSPARTITIONSTAT " +
-        "WHERE SYSTEM_TABLE_SCHEMA = '" + library + "' " +
-        "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' " +
-        "AND TRIM(SOURCE_TYPE) <> '' " +
-        "AND SYSTEM_TABLE_MEMBER IN (" + inClause + ") ";
+        "WHERE TRIM(SOURCE_TYPE) <> '' " + //TODO: Is this source_type validation right?
+        "AND SYSTEM_TABLE_SCHEMA = '" + library + "' " +
+        (sourcePf.isEmpty()? "" : "AND SYSTEM_TABLE_NAME = '" + sourcePf + "' ") +
+        (members.isEmpty()? "" : "AND SYSTEM_TABLE_MEMBER IN (" + members.stream().map(m -> "'" + m + "'").collect(Collectors.joining(", ")) + ") ");
   }
 
   public void validateSourcePFs(String sourcePf, String library) throws SQLException{
