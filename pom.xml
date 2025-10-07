@@ -7,8 +7,10 @@
   <artifactId>SourceMigrator</artifactId>
   <packaging>jar</packaging>
   <version>1.0-SNAPSHOT</version>
+
   <name>SourceMigrator</name>
-  <url>http://maven.apache.org</url>
+  <description>Tool for migrating IBM i source members to IFS stream files</description>
+  <url>https://github.com/kraudy/SourceMigrator</url>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -86,5 +88,21 @@
       </plugin>
     </plugins>
   </build>
+
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <name>GitHub kraudy Apache Maven Packages</name>
+      <url>https://maven.pkg.github.com/kraudy/SourceMigrator</url>
+    </repository>
+  </distributionManagement>
+
+  <developers>
+    <developer>
+      <id>kraudy</id>
+      <name>Roberto Torrez</name>
+      <email>robkraudy@gmail.com</email>
+    </developer>
+  </developers>
 
 </project>
