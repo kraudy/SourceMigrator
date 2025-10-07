@@ -145,8 +145,32 @@ public class SourceMigrator implements Runnable{
     this.currentUser.loadUserInformation();
   }
 
+  public SourceMigrator(AS400 system, Connection connection, String library, String sourcePf, List<String> members, 
+      String outDir, boolean debug, boolean verbose) throws Exception {
+
+    this(system, connection);
+
+    this.library = library;
+    this.sourcePf = sourcePf;
+    this.members = members;
+    this.outDir = outDir;
+    this.debug = debug;
+    this.verbose = verbose;
+
+  }
+
   @Override
   public void run() {
+    try {
+      api();
+    } catch (Exception e) {
+      e.printStackTrace();
+    } finally {
+      cleanup();
+    }
+  }
+
+  public void api(){
     try {
       // Utilities
       this.utilities = new Utilities(connection, currentUser, verbose);
@@ -196,11 +220,9 @@ public class SourceMigrator implements Runnable{
       System.out.println("Migration errors: " + migrationErrors);
       long durationNanos = System.nanoTime() - startTime;
       System.out.printf("Total time taken: %.2f seconds%n", TimeUnit.NANOSECONDS.toMillis(durationNanos) / 1000.0);
-
+      
     } catch (Exception e) {
       e.printStackTrace();
-    } finally {
-      cleanup();
     }
   }
 
