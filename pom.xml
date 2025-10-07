@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.github.kraudy.migrator</groupId>
-  <artifactId>SourceMigrator</artifactId>
+  <artifactId>sourcemigrator</artifactId>
   <packaging>jar</packaging>
   <version>1.0-SNAPSHOT</version>
 
@@ -94,6 +94,9 @@
       <id>github</id>
       <name>GitHub kraudy Apache Maven Packages</name>
       <url>https://maven.pkg.github.com/kraudy/SourceMigrator</url>
+      <snapshots>
+        <enabled>true</enabled>  <!-- Added for SNAPSHOT support -->
+      </snapshots>
     </repository>
   </distributionManagement>
 

@@ -5,7 +5,15 @@
   <artifactId>SourceMigrator</artifactId>
   <name>SourceMigrator</name>
   <version>1.0-SNAPSHOT</version>
-  <url>http://maven.apache.org</url>
+  <description>Tool for migrating IBM i source members to IFS stream files</description>
+  <url>https://github.com/kraudy/SourceMigrator</url>
+  <developers>
+    <developer>
+      <id>kraudy</id>
+      <name>Roberto Torrez</name>
+      <email>robkraudy@gmail.com</email>
+    </developer>
+  </developers>
   <build>
     <plugins>
       <plugin>
@@ -61,6 +69,13 @@
       </exclusions>
     </dependency>
   </dependencies>
+  <distributionManagement>
+    <repository>
+      <id>github</id>
+      <name>GitHub kraudy Apache Maven Packages</name>
+      <url>https://maven.pkg.github.com/kraudy/SourceMigrator</url>
+    </repository>
+  </distributionManagement>
   <properties>
     <maven.compiler.target>1.8</maven.compiler.target>
     <maven.compiler.source>1.8</maven.compiler.source>
