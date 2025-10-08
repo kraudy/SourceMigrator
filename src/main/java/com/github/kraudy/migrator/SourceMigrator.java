@@ -170,6 +170,16 @@ public class SourceMigrator implements Runnable{
     }
   }
 
+  public void setParams(String library, String sourcePf, List<String> members, 
+      String outDir, boolean debug, boolean verbose){
+    this.library = library;
+    this.sourcePf = sourcePf;
+    this.members = members;
+    this.outDir = outDir;
+    this.debug = debug;
+    this.verbose = verbose;
+  }
+
   public void api(){
     try {
       // Utilities
