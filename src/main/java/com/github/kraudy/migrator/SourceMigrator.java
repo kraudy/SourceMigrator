@@ -180,6 +180,10 @@ public class SourceMigrator implements Runnable{
     }
   }
 
+  public void setParams(String srcfileCmd, String members, String outDir){
+    this.setParams(srcfileCmd, Arrays.asList(members), outDir);
+  }
+
   public void setParams(String srcfileCmd, List<String> members, String outDir){
     String[] parts = srcfileCmd.trim().split("/");
     if (parts.length != 2) {
