@@ -124,7 +124,7 @@ public class SourceMigrator implements Runnable{
   @Option(names = { "-h", "--help" }, usageHelp = true, description = "Migrates IBM i source physical files to IFS stream files")
   private boolean helpRequested = false;
 
-  private List<String> migratedPaths;
+  private List<String> migratedPaths = new ArrayList<>();
 
   private boolean returnPaths = false;
 
@@ -189,6 +189,7 @@ public class SourceMigrator implements Runnable{
 
   public void api(){
     try {
+
       // Utilities
       this.utilities = new Utilities(connection, currentUser, verbose);
 
