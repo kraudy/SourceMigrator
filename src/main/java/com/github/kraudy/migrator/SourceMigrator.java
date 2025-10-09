@@ -180,8 +180,15 @@ public class SourceMigrator implements Runnable{
     }
   }
 
-  public void setParams(String library, String sourcePf, List<String> members, 
-      String outDir){
+  public void setParams(String srcfileCmd, List<String> members, String outDir){
+    String[] parts = srcfileCmd.trim().split("/");
+    if (parts.length != 2) {
+        throw new IllegalArgumentException("SRCFILE param must be in format 'LIB/PF'");
+    }
+    this.setParams(parts[0], parts[1], members, outDir);
+  }
+
+  public void setParams(String library, String sourcePf, List<String> members, String outDir){
     this.library = library;
     this.sourcePf = sourcePf;
     this.members = members;
