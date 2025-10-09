@@ -150,17 +150,22 @@ public class SourceMigrator implements Runnable{
     this.currentUser.loadUserInformation();
   }
 
+  public SourceMigrator(AS400 system, Connection connection, boolean debug, boolean verbose) throws Exception {
+    this(system, connection);
+
+    this.debug = debug;
+    this.verbose = verbose;
+  }
+
   public SourceMigrator(AS400 system, Connection connection, String library, String sourcePf, List<String> members, 
       String outDir, boolean debug, boolean verbose) throws Exception {
 
-    this(system, connection);
+    this(system, connection, debug, verbose);
 
     this.library = library;
     this.sourcePf = sourcePf;
     this.members = members;
     this.outDir = outDir;
-    this.debug = debug;
-    this.verbose = verbose;
 
   }
 
@@ -176,13 +181,11 @@ public class SourceMigrator implements Runnable{
   }
 
   public void setParams(String library, String sourcePf, List<String> members, 
-      String outDir, boolean debug, boolean verbose){
+      String outDir){
     this.library = library;
     this.sourcePf = sourcePf;
     this.members = members;
     this.outDir = outDir;
-    this.debug = debug;
-    this.verbose = verbose;
 
     this.returnPaths = true;
   }
