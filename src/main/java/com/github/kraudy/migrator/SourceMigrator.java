@@ -16,6 +16,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -123,6 +124,10 @@ public class SourceMigrator implements Runnable{
   @Option(names = { "-h", "--help" }, usageHelp = true, description = "Migrates IBM i source physical files to IFS stream files")
   private boolean helpRequested = false;
 
+  private List<String> migratedPaths;
+
+  private boolean returnPaths = false;
+
   /*
    * Constructor initializes the AS400 connection and JDBC.
    * 
@@ -178,6 +183,8 @@ public class SourceMigrator implements Runnable{
     this.outDir = outDir;
     this.debug = debug;
     this.verbose = verbose;
+
+    this.returnPaths = true;
   }
 
   public void api(){
@@ -236,6 +243,24 @@ public class SourceMigrator implements Runnable{
     }
   }
 
+  public List<String> getPathList(){
+    if (returnPaths){
+       return migratedPaths;
+    }
+    return Arrays.asList("");
+  }
+
+  public String getPathList(int index){
+    if (returnPaths){
+       return migratedPaths.get(index);
+    }
+    return "";
+  }
+
+  public String getFirstPath(){
+    return getPathList(0);
+  }
+
   /* Main entry point of the migration process. */
   public void migrate(String querySources, String ifsOutputDir, String library) throws SQLException, IOException,
       AS400SecurityException, ErrorCompletingRequestException, InterruptedException, PropertyVetoException {
@@ -277,6 +302,9 @@ public class SourceMigrator implements Runnable{
         } else {
           System.out.println("Migrated SourcePf: " + sourcePf + " | member: " + memberName + "." + sourceType + ": OK");
           totalMembersMigrated++;
+          if (returnPaths){
+            migratedPaths.add("'" + ifsOutputDir + "/" + memberName + "." + sourceType + "'");
+          }
         }
 
       } catch (AS400SecurityException | ErrorCompletingRequestException | IOException | InterruptedException
