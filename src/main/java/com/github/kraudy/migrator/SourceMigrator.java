@@ -10,6 +10,7 @@ import com.ibm.as400.access.User;
 import io.github.theprez.dotenv_ibmi.IBMiDotEnv;
 
 import java.beans.PropertyVetoException;
+import java.io.File;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -220,7 +221,7 @@ public class SourceMigrator implements Runnable{
       utilities.validateLibrary(library);
 
       if(this.sourceStmf.isEmpty()){
-        memberMigration();
+        memberMigration(); // If no stream file is provided, then it is a member migration.
       } else {
         streamFileMigration();
       }
@@ -230,20 +231,40 @@ public class SourceMigrator implements Runnable{
     }
   }
 
-  public void streamFileMigration(){
+  public void streamFileMigration() throws SQLException, IOException{
+    if (sourcePf.isEmpty()) {
+      throw new IllegalArgumentException("Source PF must be provided.");
+    }
+
+    utilities.validateSourcePFs(sourcePf, library); // Validate if SourcePf exists.
+
+    ///home/ROBKRAUDY/sources/ROBKRAUDY1/QRPGLESRC/HELLO.RPGLE
+    // Parse this. Find first '/' then get '.' and from that get the name and the source type
+    //TODO: Required for now but could be set to the stream file name.
+    if (members.isEmpty()) {
+      throw new IllegalArgumentException("Member name is required for now.");
+    }
+
+    utilities.validateMembers(library, sourcePf, members); // Validate if Member exists.
+
+    sourceStmf = utilities.getIFSPath(sourceStmf); // Get stream file path
+
+    if(!utilities.ValidateIFSPath(sourceStmf)){
+      throw new IllegalArgumentException(" *Path does not exists: " + sourceStmf);
+    }
 
   }
 
   public void memberMigration() throws IOException, SQLException, AS400SecurityException, ErrorCompletingRequestException, 
       InterruptedException, PropertyVetoException{
-    outDir = utilities.getOutputDirectory(outDir); // Validate source dir
+    outDir = utilities.getIFSPath(outDir); // Get source dir
     utilities.createDirectory(outDir + "/" + library);
 
     if (!members.isEmpty() && sourcePf.isEmpty()) {
       throw new IllegalArgumentException("Members can only be specified when a specific source PF is provided.");
     }
     
-    /* No specific sourcPf nor Members */
+    /* No specific sourcPf nor Members is provided: Migrate all sourcePf with their members */
     if(sourcePf.isEmpty() && members.isEmpty()){
       utilities.createDirectory(outDir, library);
     }

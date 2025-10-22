@@ -47,7 +47,8 @@ public class Utilities {
     return "";
   }
 
-  public String getOutputDirectory(String outDir) throws IOException {
+  //TODO: Maybe this should return the FILE object
+  public String getIFSPath(String outDir) throws IOException {
     if (outDir.startsWith("/")) {
       return outDir; // Full path
     }
@@ -61,6 +62,12 @@ public class Utilities {
     }
 
     return homeDir + "/" + outDir; // Relative path
+  }
+
+  //TODO: Change to validateIFSPath and create another for createDirectory
+  public boolean ValidateIFSPath(String path){
+    File sourceFile = new File(path);
+    return sourceFile.exists();
   }
 
   public void createDirectory(String dirPath) {
