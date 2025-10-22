@@ -217,55 +217,68 @@ public class SourceMigrator implements Runnable{
       // Utilities
       this.utilities = new Utilities(connection, currentUser, verbose);
 
-      outDir = utilities.getOutputDirectory(outDir); // Validate source dir
-      
       utilities.validateLibrary(library);
-      utilities.createDirectory(outDir + "/" + library);
 
-      if (!members.isEmpty() && sourcePf.isEmpty()) {
-        throw new IllegalArgumentException("Members can only be specified when a specific source PF is provided.");
+      if(this.sourceStmf.isEmpty()){
+        memberMigration();
+      } else {
+        streamFileMigration();
       }
-      
-      /* No specific sourcPf nor Members */
-      if(sourcePf.isEmpty() && members.isEmpty()){
-        utilities.createDirectory(outDir, library);
-      }
-
-      /* Specific SourcPf and no Members */
-      if(!sourcePf.isEmpty() && members.isEmpty()){
-        utilities.validateSourcePFs(sourcePf, library);
-        utilities.createDirectory(outDir, library, sourcePf);
-      }
-
-      /* Specific SourcPf and Members */
-      if (!sourcePf.isEmpty() && !members.isEmpty()) {
-        utilities.validateSourcePFs(sourcePf, library);
-        utilities.createDirectory(outDir, library, sourcePf);
-        members = members.stream().map(String::trim).map(String::toUpperCase).distinct().collect(Collectors.toList());
-        utilities.validateMembers(library, sourcePf, members);
-      }
-
-      String querySources = utilities.getMigrationQuery(library, sourcePf, members);
-
-      //TODO: Add verbose validation
-      System.out.println("User: " + system.getUserId().trim().toUpperCase());
-      System.out.println("System: " + utilities.getSystemName());
-      System.out.println("System's CCSID: " + utilities.getCcsid());
-
-      long startTime = System.nanoTime();
-
-      migrate(querySources, outDir + "/" + library, library);
-
-      System.out.println("\nMigration completed.");
-      System.out.println("Total Source PFs migrated: " + totalSourcePFsMigrated);
-      System.out.println("Total members migrated: " + totalMembersMigrated);
-      System.out.println("Migration errors: " + migrationErrors);
-      long durationNanos = System.nanoTime() - startTime;
-      System.out.printf("Total time taken: %.2f seconds%n", TimeUnit.NANOSECONDS.toMillis(durationNanos) / 1000.0);
       
     } catch (Exception e) {
       e.printStackTrace();
     }
+  }
+
+  public void streamFileMigration(){
+
+  }
+
+  public void memberMigration() throws IOException, SQLException, AS400SecurityException, ErrorCompletingRequestException, 
+      InterruptedException, PropertyVetoException{
+    outDir = utilities.getOutputDirectory(outDir); // Validate source dir
+    utilities.createDirectory(outDir + "/" + library);
+
+    if (!members.isEmpty() && sourcePf.isEmpty()) {
+      throw new IllegalArgumentException("Members can only be specified when a specific source PF is provided.");
+    }
+    
+    /* No specific sourcPf nor Members */
+    if(sourcePf.isEmpty() && members.isEmpty()){
+      utilities.createDirectory(outDir, library);
+    }
+
+    /* Specific SourcPf and no Members */
+    if(!sourcePf.isEmpty() && members.isEmpty()){
+      utilities.validateSourcePFs(sourcePf, library);
+      utilities.createDirectory(outDir, library, sourcePf);
+    }
+
+    /* Specific SourcPf and Members */
+    if (!sourcePf.isEmpty() && !members.isEmpty()) {
+      utilities.validateSourcePFs(sourcePf, library);
+      utilities.createDirectory(outDir, library, sourcePf);
+      members = members.stream().map(String::trim).map(String::toUpperCase).distinct().collect(Collectors.toList());
+      utilities.validateMembers(library, sourcePf, members);
+    }
+
+    String querySources = utilities.getMigrationQuery(library, sourcePf, members);
+
+    //TODO: Add verbose validation
+    System.out.println("User: " + system.getUserId().trim().toUpperCase());
+    System.out.println("System: " + utilities.getSystemName());
+    System.out.println("System's CCSID: " + utilities.getCcsid());
+
+    long startTime = System.nanoTime();
+
+    migrate(querySources, outDir + "/" + library, library);
+
+    System.out.println("\nMigration completed.");
+    System.out.println("Total Source PFs migrated: " + totalSourcePFsMigrated);
+    System.out.println("Total members migrated: " + totalMembersMigrated);
+    System.out.println("Migration errors: " + migrationErrors);
+    long durationNanos = System.nanoTime() - startTime;
+    System.out.printf("Total time taken: %.2f seconds%n", TimeUnit.NANOSECONDS.toMillis(durationNanos) / 1000.0);
   }
 
   public List<String> getPathList(){
