@@ -92,6 +92,7 @@ public class SourceMigrator implements Runnable{
     }
   }
 
+  //TODO: Make thsese a key library | library.sourcePf | library.sourcepf mbr1 mbr2 mbr3
   @Option(names = { "-sl", "--source-lib" }, required = true, description = "Source library", converter = LibraryConverter.class)
   private String library;
 
@@ -100,6 +101,10 @@ public class SourceMigrator implements Runnable{
 
   @Option(names = "--mbrs", arity = "0..*", description = "Specific source members to migrate", converter = SourceMemberConverter.class)
   private List<String> members = new ArrayList<>();
+
+  //TODO: If this is proveded do the reverse migration but library sourcePf and member are required. Member could be omitted with a default.
+  @Option(names = { "-stmf", "--source-stmf" }, description = "Source stream file path in IFS (e.g., /home/sources/hello.rpgle).")
+  private String sourceStmf = "";
 
   /* 
   @Option(names = {"-ut", "--updated-time"}, description = "Migrate only sources with change after timestamp")
