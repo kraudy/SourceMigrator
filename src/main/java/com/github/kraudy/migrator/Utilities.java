@@ -65,7 +65,7 @@ public class Utilities {
   }
 
   //TODO: Change to validateIFSPath and create another for createDirectory
-  public boolean ValidateIFSPath(String path){
+  public boolean validateIFSPath(String path){
     File sourceFile = new File(path);
     return sourceFile.exists();
   }

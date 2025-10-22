@@ -3,6 +3,7 @@ package com.github.kraudy.migrator;
 import com.ibm.as400.access.AS400;
 import com.ibm.as400.access.AS400SecurityException;
 import com.ibm.as400.access.AS400JDBCDataSource;
+import com.ibm.as400.access.AS400Message;
 import com.ibm.as400.access.CommandCall;
 import com.ibm.as400.access.ErrorCompletingRequestException;
 import com.ibm.as400.access.User;
@@ -12,6 +13,8 @@ import io.github.theprez.dotenv_ibmi.IBMiDotEnv;
 import java.beans.PropertyVetoException;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -245,14 +248,60 @@ public class SourceMigrator implements Runnable{
       throw new IllegalArgumentException("Member name is required for now.");
     }
 
+    //TODO: Add member creation : ADDPFM FILE(library/filename) MBR(membername) SRCTYPE(RPGLE)
     utilities.validateMembers(library, sourcePf, members); // Validate if Member exists.
 
     sourceStmf = utilities.getIFSPath(sourceStmf); // Get stream file path
 
-    if(!utilities.ValidateIFSPath(sourceStmf)){
+    if(!utilities.validateIFSPath(sourceStmf)){
       throw new IllegalArgumentException(" *Path does not exists: " + sourceStmf);
     }
 
+    // Get filename and parse it
+    String[] parts = Paths.get(sourceStmf).getFileName().toString().split("\\.");
+    String name = parts[0];    // "HELLO"
+    String extension = parts[1];  // "RPGLE"
+
+    //TODO: Could use parts[0] as member
+    migrateStreamFile(sourceStmf, library, sourcePf, members.get(0), parts[1]);
+
+  }
+
+  public void migrateStreamFile(String ifsPath, String library, String sourcePf, String member, String sourceType){
+    try {
+      String commandStr = "CPYFRMSTMF FROMSTMF('" + ifsPath + "') " +
+          "TOMBR('/QSYS.lib/" + library + ".lib/" + sourcePf + ".file/" + member + ".mbr') " +
+          "MBROPT(*REPLACE) " +
+          "CVTDTA(*AUTO) " +  // Enable automatic CCSID conversion
+          "STMFCODPAG(" + UTF8_CCSID + ") " //+  // Source stream file CCSID (UTF-8)
+          //"DBFCCSID(" + utilities.getCcsid() + ")"  // Target database member CCSID (EBCDIC 37)
+          ;
+        
+      System.out.println("Command: " + commandStr);
+      CommandCall cmd = new CommandCall(system);
+
+      if (!cmd.run(commandStr)) {
+        System.out.println("Could not migrate " + ifsPath + ": Failed");
+        AS400Message[] messages = cmd.getMessageList();
+        for (AS400Message msg : messages) {
+          System.out.println(msg.getID() + ": " + msg.getText());
+        }
+        migrationErrors++;
+      } else {
+        System.out.println("Migrated SourcePf: " + sourcePf + " | member: " + member + "." + sourceType + ": OK");
+        totalMembersMigrated++;
+        if (returnPaths){
+          migratedPaths.add("'" + ifsPath + "'");
+        }
+      }
+
+    } catch (AS400SecurityException | ErrorCompletingRequestException | IOException | InterruptedException
+        | PropertyVetoException e) {
+
+      System.out.println("Could not migrate " + ifsPath + ": Failed");
+      migrationErrors++;
+      e.printStackTrace();
+    }
   }
 
   public void memberMigration() throws IOException, SQLException, AS400SecurityException, ErrorCompletingRequestException, 
@@ -292,7 +341,7 @@ public class SourceMigrator implements Runnable{
 
     long startTime = System.nanoTime();
 
-    migrate(querySources, outDir + "/" + library, library);
+    migrateMember(querySources, outDir + "/" + library, library);
 
     System.out.println("\nMigration completed.");
     System.out.println("Total Source PFs migrated: " + totalSourcePFsMigrated);
@@ -321,7 +370,7 @@ public class SourceMigrator implements Runnable{
   }
 
   /* Main entry point of the migration process. */
-  public void migrate(String querySources, String ifsOutputDir, String library) throws SQLException, IOException,
+  public void migrateMember(String querySources, String ifsOutputDir, String library) throws SQLException, IOException,
       AS400SecurityException, ErrorCompletingRequestException, InterruptedException, PropertyVetoException {
     try (Statement stmt = connection.createStatement();
         ResultSet rsQuerySources = stmt.executeQuery(querySources)) {
