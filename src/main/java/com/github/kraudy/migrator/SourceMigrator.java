@@ -241,16 +241,6 @@ public class SourceMigrator implements Runnable{
 
     utilities.validateSourcePFs(sourcePf, library); // Validate if SourcePf exists.
 
-    ///home/ROBKRAUDY/sources/ROBKRAUDY1/QRPGLESRC/HELLO.RPGLE
-    // Parse this. Find first '/' then get '.' and from that get the name and the source type
-    //TODO: Required for now but could be set to the stream file name.
-    if (members.isEmpty()) {
-      throw new IllegalArgumentException("Member name is required for now.");
-    }
-
-    //TODO: Add member creation : ADDPFM FILE(library/filename) MBR(membername) SRCTYPE(RPGLE)
-    utilities.validateMembers(library, sourcePf, members); // Validate if Member exists.
-
     sourceStmf = utilities.getIFSPath(sourceStmf); // Get stream file path
 
     if(!utilities.validateIFSPath(sourceStmf)){
@@ -259,11 +249,22 @@ public class SourceMigrator implements Runnable{
 
     // Get filename and parse it
     String[] parts = Paths.get(sourceStmf).getFileName().toString().split("\\.");
-    String name = parts[0];    // "HELLO"
-    String extension = parts[1];  // "RPGLE"
+    String name = parts[0].trim().toUpperCase();    // "HELLO"
+    String sourceType = parts[1].trim().toUpperCase();  // "RPGLE"
+
+    ///home/ROBKRAUDY/sources/ROBKRAUDY1/QRPGLESRC/HELLO.RPGLE
+    // Parse this. Find first '/' then get '.' and from that get the name and the source type
+    //TODO: Required for now but could be set to the stream file name.
+    if (members.isEmpty()) {
+      members = Arrays.asList(name);
+      //throw new IllegalArgumentException("Member name is required for now.");
+    }
+
+    //TODO: Add member creation : ADDPFM FILE(library/filename) MBR(membername) SRCTYPE(RPGLE)
+    utilities.validateMembers(library, sourcePf, members); // Validate if Member exists.
 
     //TODO: Could use parts[0] as member
-    migrateStreamFile(sourceStmf, library, sourcePf, members.get(0), parts[1]);
+    migrateStreamFile(sourceStmf, library, sourcePf, members.get(0), sourceType);
 
   }
 
