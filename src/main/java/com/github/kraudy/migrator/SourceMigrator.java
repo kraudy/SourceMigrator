@@ -273,7 +273,8 @@ public class SourceMigrator implements Runnable{
           "TOMBR('/QSYS.lib/" + library + ".lib/" + sourcePf + ".file/" + member + ".mbr') " +
           "MBROPT(*REPLACE) " +
           "CVTDTA(*AUTO) " +  // Enable automatic CCSID conversion
-          "STMFCODPAG(" + UTF8_CCSID + ") " //+  // Source stream file CCSID (UTF-8)
+          "STMFCODPAG(" + UTF8_CCSID + ") "   // Source stream file CCSID (UTF-8)
+          //"DBFCCSID(" + INVARIANT_CCSID + ")"  // Target database member CCSID (EBCDIC 37)
           //"DBFCCSID(" + utilities.getCcsid() + ")"  // Target database member CCSID (EBCDIC 37)
           ;
         
