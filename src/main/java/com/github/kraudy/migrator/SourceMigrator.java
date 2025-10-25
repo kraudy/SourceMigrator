@@ -249,25 +249,20 @@ public class SourceMigrator implements Runnable{
 
     // Get filename and parse it
     String[] parts = Paths.get(sourceStmf).getFileName().toString().split("\\.");
-    String name = parts[0].trim().toUpperCase();    // "HELLO"
-    String sourceType = parts[1].trim().toUpperCase();  // "RPGLE"
+    String name = parts[0].trim().toUpperCase();
+    String sourceType = parts[1].trim().toUpperCase();
 
-    ///home/ROBKRAUDY/sources/ROBKRAUDY1/QRPGLESRC/HELLO.RPGLE
-    // Parse this. Find first '/' then get '.' and from that get the name and the source type
-    //TODO: Required for now but could be set to the stream file name.
+    // Set member to filename if not provided
     if (members.isEmpty()) {
       members = Arrays.asList(name);
-      //throw new IllegalArgumentException("Member name is required for now.");
     }
 
-    //TODO: Add member creation : ADDPFM FILE(library/filename) MBR(membername) SRCTYPE(RPGLE)
     try{
       utilities.validateMembers(library, sourcePf, members); // Validate if Member exists.
     } catch (IllegalArgumentException e) {
       createSourceMember(library + "/" + sourcePf, members.get(0), sourceType);
     }
 
-    //TODO: Could use parts[0] as member
     migrateStreamFile(sourceStmf, library, sourcePf, members.get(0), sourceType);
 
   }
