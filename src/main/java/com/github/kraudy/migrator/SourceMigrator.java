@@ -264,7 +264,7 @@ public class SourceMigrator implements Runnable{
     try{
       utilities.validateMembers(library, sourcePf, members); // Validate if Member exists.
     } catch (IllegalArgumentException e) {
-      createSourceMember();
+      createSourceMember(library + "/" + sourcePf, members.get(0), sourceType);
     }
 
     //TODO: Could use parts[0] as member
@@ -272,8 +272,28 @@ public class SourceMigrator implements Runnable{
 
   }
 
-  public void createSourceMember(){
+  public void createSourceMember(String qualifiedSourcePf, String member, String sourceType){
+    try{
+      String commandStr = "ADDPFM FILE(" + qualifiedSourcePf + ") " +
+        "MBR(" + member + ") SRCTYPE(" + sourceType + ")";
+      
+      System.out.println("Command: " + commandStr);
+      CommandCall cmd = new CommandCall(system);
 
+      if (!cmd.run(commandStr)) {
+        System.out.println("Could not execute command");
+        AS400Message[] messages = cmd.getMessageList();
+        for (AS400Message msg : messages) {
+          System.out.println(msg.getID() + ": " + msg.getText());
+        }
+      } else {
+        System.out.println("Command executed");
+      }
+
+    } catch (AS400SecurityException | ErrorCompletingRequestException | IOException | InterruptedException
+        | PropertyVetoException e) {
+      e.printStackTrace();
+    }
   }
 
   public void migrateStreamFile(String ifsPath, String library, String sourcePf, String member, String sourceType){
