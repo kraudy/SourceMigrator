@@ -261,10 +261,18 @@ public class SourceMigrator implements Runnable{
     }
 
     //TODO: Add member creation : ADDPFM FILE(library/filename) MBR(membername) SRCTYPE(RPGLE)
-    utilities.validateMembers(library, sourcePf, members); // Validate if Member exists.
+    try{
+      utilities.validateMembers(library, sourcePf, members); // Validate if Member exists.
+    } catch (IllegalArgumentException e) {
+      createSourceMember();
+    }
 
     //TODO: Could use parts[0] as member
     migrateStreamFile(sourceStmf, library, sourcePf, members.get(0), sourceType);
+
+  }
+
+  public void createSourceMember(){
 
   }
 
