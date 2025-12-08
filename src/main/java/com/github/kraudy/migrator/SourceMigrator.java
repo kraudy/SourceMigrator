@@ -436,7 +436,7 @@ public class SourceMigrator implements Runnable{
           System.out.println("Migrated SourcePf: " + sourcePf + " | member: " + memberName + "." + sourceType + ": OK");
           totalMembersMigrated++;
           if (returnPaths){
-            migratedPaths.add("'" + ifsOutputDir + "/" + memberName + "." + sourceType + "'");
+            migratedPaths.add(ifsOutputDir + "/" + memberName + "." + sourceType);
           }
         }
 
