@@ -119,8 +119,6 @@ public class Utilities {
   public void validateSourcePFs(String sourcePf, String library) throws SQLException{
     if (sourcePf.equals("")) throw new IllegalArgumentException("Source PF is empty");
 
-    if ("QTEMP".equals(library.toUpperCase())) return; // Don't check for sourcPf in QTEMP
-
     // Validate if Source PF exists
     try (Statement validateStmt = connection.createStatement();
         ResultSet validateRs = validateStmt.executeQuery(

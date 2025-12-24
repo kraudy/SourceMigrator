@@ -265,7 +265,11 @@ public class SourceMigrator implements Runnable{
       throw new IllegalArgumentException("Source PF must be provided.");
     }
 
-    utilities.validateSourcePFs(sourcePf, library); // Validate if SourcePf exists.
+    try {
+      utilities.validateSourcePFs(sourcePf, library); // Validate if SourcePf exists.
+    } catch (IllegalArgumentException e){
+      createSourcePf(library + "/" + sourcePf);
+    }
 
     sourceStmf = utilities.getIFSPath(sourceStmf); // Get stream file path
 
@@ -291,6 +295,29 @@ public class SourceMigrator implements Runnable{
 
     migrateStreamFile(sourceStmf, library, sourcePf, members.get(0), sourceType);
 
+  }
+
+  public void createSourcePf(String qualifiedSourcePf){
+    try{
+      String commandStr = "CRTSRCPF FILE(" + qualifiedSourcePf + ")";
+      
+      System.out.println("Command: " + commandStr);
+      CommandCall cmd = new CommandCall(system);
+
+      if (!cmd.run(commandStr)) {
+        System.out.println("Could not execute command");
+        AS400Message[] messages = cmd.getMessageList();
+        for (AS400Message msg : messages) {
+          System.out.println(msg.getID() + ": " + msg.getText());
+        }
+      } else {
+        System.out.println("Command executed");
+      }
+
+    } catch (AS400SecurityException | ErrorCompletingRequestException | IOException | InterruptedException
+        | PropertyVetoException e) {
+      e.printStackTrace();
+    }
   }
 
   public void createSourceMember(String qualifiedSourcePf, String member, String sourceType){
