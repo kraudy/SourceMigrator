@@ -189,11 +189,11 @@ public class SourceMigrator implements Runnable{
     }
   }
 
-  public void setParams(String srcfileCmd, String members, String outDir){
-    this.setParams(srcfileCmd, Arrays.asList(members), outDir);
+  public void setMigrationParams(String srcfileCmd, String members, String outDir){
+    this.setMigrationParams(srcfileCmd, Arrays.asList(members), outDir);
   }
 
-  public void setParams(String srcfileCmd, List<String> members, String outDir){
+  public void setMigrationParams(String srcfileCmd, List<String> members, String outDir){
     if (srcfileCmd == null) throw new IllegalArgumentException("SRCFILE can not be null");
 
     String[] parts = srcfileCmd.trim().split("/");
@@ -203,14 +203,40 @@ public class SourceMigrator implements Runnable{
     if(parts[0].isEmpty()) throw new IllegalArgumentException("Library can not be empty");
     if(parts[1].isEmpty()) throw new IllegalArgumentException("SourcePf can not be empty");
 
-    this.setParams(parts[0], parts[1], members, outDir);
+    this.setMigrationParams(parts[0], parts[1], members, outDir);
   }
 
-  public void setParams(String library, String sourcePf, List<String> members, String outDir){
+  public void setMigrationParams(String library, String sourcePf, List<String> members, String outDir){
     this.library = library;
     this.sourcePf = sourcePf;
     this.members = members;
     this.outDir = outDir;
+
+    this.returnPaths = true;
+  }
+
+  public void setReverseMigrationParams(String srcfileCmd, String members, String streamFile){
+    this.setReverseMigrationParams(srcfileCmd, Arrays.asList(members), streamFile);
+  }
+
+  public void setReverseMigrationParams(String srcfileCmd, List<String> members, String streamFile){
+    if (srcfileCmd == null) throw new IllegalArgumentException("SRCFILE can not be null");
+
+    String[] parts = srcfileCmd.trim().split("/");
+    if (parts.length != 2) {
+        throw new IllegalArgumentException("SRCFILE param must be in format 'LIB/PF'");
+    }
+    if(parts[0].isEmpty()) throw new IllegalArgumentException("Library can not be empty");
+    if(parts[1].isEmpty()) throw new IllegalArgumentException("SourcePf can not be empty");
+
+    this.setReverseMigrationParams(parts[0], parts[1], members, streamFile);
+  }
+
+  public void setReverseMigrationParams(String library, String sourcePf, List<String> members, String streamFile){
+    this.library = library;
+    this.sourcePf = sourcePf;
+    this.members = members;
+    this.sourceStmf = streamFile;
 
     this.returnPaths = true;
   }
