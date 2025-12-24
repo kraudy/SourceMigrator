@@ -119,6 +119,8 @@ public class Utilities {
   public void validateSourcePFs(String sourcePf, String library) throws SQLException{
     if (sourcePf.equals("")) throw new IllegalArgumentException("Source PF is empty");
 
+    if ("QTEMP".equals(library.toUpperCase())) return; // Don't check for sourcPf in QTEMP
+
     // Validate if Source PF exists
     try (Statement validateStmt = connection.createStatement();
         ResultSet validateRs = validateStmt.executeQuery(
@@ -189,7 +191,7 @@ public class Utilities {
   // TODO: Add params validation to this class
   public void validateLibrary(String library) throws SQLException {
     if ("QTEMP".equals(library.toUpperCase())) return; // QTEMP is valid
-    
+
     try (Statement validateStmt = connection.createStatement();
         ResultSet validateRs = validateStmt.executeQuery(
             "SELECT 1 AS Exists " +
