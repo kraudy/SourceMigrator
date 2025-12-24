@@ -188,6 +188,8 @@ public class Utilities {
   
   // TODO: Add params validation to this class
   public void validateLibrary(String library) throws SQLException {
+    if ("QTEMP".equals(library.toUpperCase())) return; // QTEMP is valid
+    
     try (Statement validateStmt = connection.createStatement();
         ResultSet validateRs = validateStmt.executeQuery(
             "SELECT 1 AS Exists " +
